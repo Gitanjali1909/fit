@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { sendMessage } from "@/lib/api";
-
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -124,10 +123,9 @@ export default function CoachPage() {
         : "\n(Reply in COACH MODE: You are supportive, clear, structured, and encouraging. Give highly practical fitness guidance.)";
 
     const profileContext = `[User Context: Age ${profile.age}, Weight ${profile.weight}kg, Height ${profile.height}cm, Goal: ${profile.goal}]`;
-    const fullPrompt = `${profileContext} ${cleanedText} ${personalityInstruction}`;
 
     try {
-      const data = await sendMessage(fullPrompt);
+      const data = await sendMessage(cleanedText);
       const replyText = data.reply || "No response received. Try again.";
 
       const planData = parsePlanResponse(replyText);
@@ -260,6 +258,7 @@ Diet:
           </div>
           <div>
             <h1 className="text-sm font-bold uppercase tracking-widest text-white">Fit AI Coach</h1>
+
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
