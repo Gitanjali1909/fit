@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+
+# AI
+groq
+
+# DB (add now, even if not fully used yet)
+sqlalchemy
+psycopg2-binary
+
+# optional but useful
+requests

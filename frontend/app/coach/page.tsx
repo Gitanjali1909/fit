@@ -125,7 +125,7 @@ export default function CoachPage() {
     const profileContext = `[User Context: Age ${profile.age}, Weight ${profile.weight}kg, Height ${profile.height}cm, Goal: ${profile.goal}]`;
 
     try {
-      const data = await sendMessage(cleanedText);
+      const data = await sendMessage(cleanedText, profile, mode);
       const replyText = data.reply || "No response received. Try again.";
 
       const planData = parsePlanResponse(replyText);
