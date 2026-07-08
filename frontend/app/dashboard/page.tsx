@@ -168,19 +168,45 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* AI Insight Card */}
-        {data && data.ai_insight && (
-          <div className="bg-[#080808]/90 border border-emerald-500/10 p-4 rounded-lg flex items-start gap-3 shadow-sm animate-slideUp relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 filter blur-xl rounded-full pointer-events-none"></div>
-            <span className="text-lg select-none">😈</span>
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-emerald-450 font-bold uppercase tracking-wider">AI Coach Insight</span>
-                <span className="text-[8px] text-gray-500 uppercase font-semibold">Real-Time Evaluation</span>
+        {/* AI Insight & Adaptive Planning Card */}
+        {data && (data.ai_insight || data.plan_adjustment) && (
+          <div className="bg-[#080808]/90 border border-emerald-500/10 p-5 rounded-lg flex flex-col sm:flex-row gap-5 shadow-sm animate-slideUp relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 filter blur-2xl rounded-full pointer-events-none"></div>
+            
+            {/* Left side: AI Insight of the Day */}
+            <div className="flex-1 flex gap-3">
+              <span className="text-xl select-none">😈</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">AI Insight of the Day</span>
+                  <span className="text-[8px] text-gray-500 uppercase font-semibold">Real-Time Evaluation</span>
+                </div>
+                <p className="text-xs text-gray-200 mt-1.5 leading-normal italic font-medium">
+                  "{data.ai_insight || "Analyzing today's telemetry..."}"
+                </p>
+                {data.adaptive_insights && data.adaptive_insights.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {data.adaptive_insights.map((insight, idx) => (
+                      <span key={idx} className="bg-red-500/10 border border-red-500/20 text-red-400 text-[8px] font-bold uppercase px-2 py-0.5 rounded-md">
+                        {insight}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-gray-200 mt-1 leading-normal italic">
-                "{data.ai_insight}"
-              </p>
+            </div>
+
+            {/* Right side: Plan Adjustment */}
+            <div className="sm:w-60 border-t sm:border-t-0 sm:border-l border-white/5 pt-4 sm:pt-0 sm:pl-5 flex flex-col justify-between">
+              <div>
+                <span className="text-[9px] text-gray-500 uppercase tracking-wider font-bold">Plan Adjustment</span>
+                <p className="text-xs font-semibold text-white mt-1">
+                  {data.plan_adjustment || "Maintain current plan"}
+                </p>
+              </div>
+              <div className="text-[9px] text-gray-500 leading-normal mt-2">
+                Adapts target routine automatically to keep your progression safe.
+              </div>
             </div>
           </div>
         )}

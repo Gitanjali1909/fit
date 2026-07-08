@@ -47,3 +47,25 @@ def generate_daily_insight(data: dict):
         return chat.choices[0].message.content.strip()
     except Exception as e:
         return "You ate like a king but moved like a rock. Fix it tomorrow. 😭"
+
+def generate_adaptive_insight(data: dict):
+    prompt = f"""
+    User Data:
+    Steps: {data.get('steps')}
+    Calories: {data.get('calories')}
+    Workouts: {data.get('workouts')}
+
+    Give a short fitness insight + suggestion.
+    """
+    try:
+        chat = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a smart, professional fitness analyst. Give a short fitness insight + practical suggestion in 1-2 lines based on the user's steps, calories, and workouts today. Keep it brief and actionable."},
+                {"role": "user", "content": prompt},
+            ],
+            model="llama3-8b-8192",
+            max_tokens=80
+        )
+        return chat.choices[0].message.content.strip()
+    except Exception as e:
+        return "Insight: Activity is low. Try adding a 15-minute walk to balance calorie intake."

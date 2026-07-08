@@ -8,7 +8,8 @@ from typing import Optional
 from db.session import get_db
 from db.models import Workout, FoodLog, ActivityLog, User
 from services.score_service import calculate_score
-from services.ai_service import generate_daily_insight
+from services.ai_service import generate_daily_insight, generate_adaptive_insight
+from services.adaptive_service import analyze_user, adjust_plan
 
 router = APIRouter()
 class WorkoutCreate(BaseModel):
@@ -121,19 +122,26 @@ async def get_dashboard(user_id: int, db: Session = Depends(get_db)):
     # Calculate real-time score out of 100
     daily_score = calculate_score(workout_payload, food_payload, activity_payload)
 
-    # Generate daily AI insight
-    insight_payload = {
-        "workout": workout_payload,
-        "food": food_payload,
-        "activity": activity_payload,
-        "score": daily_score
+    # Prepare data payload for the adaptive behavior engine
+    adaptive_payload = {
+        "steps": total_steps or 5000,
+        "calories": display_calories_in,
+        "workouts": display_workouts_done
     }
-    ai_insight = generate_daily_insight(insight_payload)
+
+    # Run behavior analysis and recommend plan adjustments
+    insights = analyze_user(adaptive_payload)
+    plan_update = adjust_plan(insights)
+
+    # Generate adaptive insights using Groq
+    ai_insight = generate_adaptive_insight(adaptive_payload)
 
     return {
         "today_calories_in": display_calories_in,
         "today_calories_burned": display_calories_burned,
         "workouts_done": display_workouts_done,
         "activity_score": daily_score,
-        "ai_insight": ai_insight
+        "ai_insight": ai_insight,
+        "adaptive_insights": insights,
+        "plan_adjustment": plan_update
     }
