@@ -5,6 +5,7 @@ export interface DashboardData {
   today_calories_burned: number;
   workouts_done: number;
   activity_score: number;
+  ai_insight: string;
 }
 
 export const fetchDashboardData = async (userId: number = 1): Promise<DashboardData> => {
@@ -13,13 +14,35 @@ export const fetchDashboardData = async (userId: number = 1): Promise<DashboardD
     headers: {
       "Content-Type": "application/json",
     },
-    cache: "no-store", // Ensure fresh data on every fetch
+    cache: "no-store",
   });
 
   if (!res.ok) {
     throw new Error("Failed to fetch dashboard data");
   }
 
+  return res.json();
+};
+
+export const fetchScoreApi = async (workout: any, food: any, activity: any) => {
+  const res = await fetch(`${API}/score`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ workout, food, activity }),
+  });
+  return res.json();
+};
+
+export const fetchInsightApi = async (workout: any, food: any, activity: any, score?: number) => {
+  const res = await fetch(`${API}/insight`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ workout, food, activity, score }),
+  });
   return res.json();
 };
 

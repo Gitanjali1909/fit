@@ -5,45 +5,45 @@ from dotenv import load_dotenv
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-
-def coach_chat(message: str, user_context: dict = None, mode: str = "coach"): # type: ignore
-    
-    personality = ""
-
-    if mode == "roast":
-        personality = """
-You are a savage but funny fitness coach.
-You roast laziness hard but never disrespect.
-You push the user to work out.
-Keep replies short and punchy.
-"""
-    else:
-        personality = """
-You are a supportive fitness coach.
-You give clear, structured, practical advice.
-Keep replies short and actionable.
+SYSTEM_PROMPT = """
+You are a strict but funny fitness coach.
+You give simple, practical advice.
+You can roast lazy users lightly.
+Keep answers short.
 """
 
-    system_prompt = f"""
-{personality}
+def ask_coach(message: str):
+    try:
+        chat = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": message},
+            ],
+            model="llama3-8b-8192"
+        )
+        return chat.choices[0].message.content
+    except Exception as e:
+        return "Stop being lazy and do 10 pushups 😭"
 
-User profile:
-{user_context}
+def generate_daily_insight(data: dict):
+    prompt = f"""
+    User data:
+    Workout: {data.get('workout')}
+    Food: {data.get('food')}
+    Activity: {data.get('activity')}
+    Score: {data.get('score')}
 
-Rules:
-- Give fitness advice only
-- Be concise
-- No long paragraphs
-- Focus on workouts + diet
-"""
-
-    completion = client.chat.completions.create(
-        model="llama3-70b-8192",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message}
-        ],
-        temperature=0.7,
-    )
-
-    return completion.choices[0].message.content
+    Give a short, savage but helpful fitness insight in 1-2 lines.
+    """
+    try:
+        chat = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a strict, savage, and funny fitness coach. Provide a roasting but helpful fitness insight based on user data in 1-2 lines. Keep it extremely brief."},
+                {"role": "user", "content": prompt},
+            ],
+            model="llama3-8b-8192",
+            max_tokens=60
+        )
+        return chat.choices[0].message.content.strip()
+    except Exception as e:
+        return "You ate like a king but moved like a rock. Fix it tomorrow. 😭"

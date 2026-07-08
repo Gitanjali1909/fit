@@ -168,6 +168,23 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* AI Insight Card */}
+        {data && data.ai_insight && (
+          <div className="bg-[#080808]/90 border border-emerald-500/10 p-4 rounded-lg flex items-start gap-3 shadow-sm animate-slideUp relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 filter blur-xl rounded-full pointer-events-none"></div>
+            <span className="text-lg select-none">😈</span>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-emerald-450 font-bold uppercase tracking-wider">AI Coach Insight</span>
+                <span className="text-[8px] text-gray-500 uppercase font-semibold">Real-Time Evaluation</span>
+              </div>
+              <p className="text-xs text-gray-200 mt-1 leading-normal italic">
+                "{data.ai_insight}"
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* STATS MATRIX SECTION */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
           

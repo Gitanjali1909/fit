@@ -7,6 +7,8 @@ from typing import Optional
 
 from db.session import get_db
 from db.models import Workout, FoodLog, ActivityLog, User
+from services.score_service import calculate_score
+from services.ai_service import generate_daily_insight
 
 router = APIRouter()
 class WorkoutCreate(BaseModel):
@@ -75,6 +77,7 @@ async def log_activity(req: ActivityCreate, db: Session = Depends(get_db)):
 async def get_dashboard(user_id: int, db: Session = Depends(get_db)):
     today = date.today()
 
+    # Aggregate today's metrics
     calories_in = db.query(func.sum(FoodLog.calories)).filter(
         FoodLog.user_id == user_id,
         FoodLog.date == today
@@ -90,25 +93,47 @@ async def get_dashboard(user_id: int, db: Session = Depends(get_db)):
         Workout.date == today
     ).count()
 
+    total_reps = db.query(func.sum(Workout.reps)).filter(
+        Workout.user_id == user_id,
+        Workout.date == today
+    ).scalar() or 0
+
+    total_steps = db.query(func.sum(ActivityLog.steps)).filter(
+        ActivityLog.user_id == user_id,
+        ActivityLog.date == today
+    ).scalar() or 0
+
     total_duration = db.query(func.sum(ActivityLog.duration)).filter(
         ActivityLog.user_id == user_id,
         ActivityLog.date == today
     ).scalar() or 0
 
-    # Base dashboard layout values (if no records logged today, show mock profile metrics)
-    base_calories_in = 1500 if calories_in == 0 else calories_in
-    base_calories_burned = 600 if calories_burned == 0 else calories_burned
-    base_workouts_done = 2 if workouts_done == 0 else workouts_done
-    
-    # Calculate a score out of 100 based on total activity duration (30 mins = 70 score, more = higher)
-    if total_duration > 0:
-        base_activity_score = min(100, 50 + int(total_duration * 1.5))
-    else:
-        base_activity_score = 70
+    # Fallbacks for empty days to keep the dashboard populated
+    display_calories_in = 1500 if calories_in == 0 else calories_in
+    display_calories_burned = 600 if calories_burned == 0 else calories_burned
+    display_workouts_done = 2 if workouts_done == 0 else workouts_done
+
+    # Prepare data payloads for the score system
+    workout_payload = {"reps": total_reps or 30}  # default reps for score calc if empty
+    food_payload = {"calories": display_calories_in}
+    activity_payload = {"steps": total_steps or 5000}
+
+    # Calculate real-time score out of 100
+    daily_score = calculate_score(workout_payload, food_payload, activity_payload)
+
+    # Generate daily AI insight
+    insight_payload = {
+        "workout": workout_payload,
+        "food": food_payload,
+        "activity": activity_payload,
+        "score": daily_score
+    }
+    ai_insight = generate_daily_insight(insight_payload)
 
     return {
-        "today_calories_in": base_calories_in,
-        "today_calories_burned": base_calories_burned,
-        "workouts_done": base_workouts_done,
-        "activity_score": base_activity_score
+        "today_calories_in": display_calories_in,
+        "today_calories_burned": display_calories_burned,
+        "workouts_done": display_workouts_done,
+        "activity_score": daily_score,
+        "ai_insight": ai_insight
     }
