@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { calculateAngle, updateSquatCounter, SquatState } from "@/lib/repCounter";
+import { logWorkoutApi } from "@/lib/dashboardApi";
+import { getOrCreateUserId } from "@/lib/user";
 
 // Dynamically import CameraView with SSR disabled to prevent Next.js server-side build crashes
 const CameraView = dynamic(() => import("@/components/CameraView"), { ssr: false });
@@ -53,6 +55,11 @@ export default function WorkoutPage() {
   const handleToggleWorkout = () => {
     if (isActive) {
       setIsActive(false);
+      // Persist workout session to database on end
+      if (squatState.reps > 0) {
+        const userId = getOrCreateUserId();
+        logWorkoutApi(userId, "Squats", squatState.reps).catch(() => {});
+      }
     } else {
       // Reset counter states upon start
       setSquatState({ reps: 0, stage: "up", lastKneeAngle: 180 });

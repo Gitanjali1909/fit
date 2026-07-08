@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { sendMessage } from "@/lib/api";
+import { savePlanApi, fetchPlanApi } from "@/lib/dashboardApi";
+import { getOrCreateUserId } from "@/lib/user";
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -50,6 +52,29 @@ export default function CoachPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Load existing plan from database on mount
+  useEffect(() => {
+    const userId = getOrCreateUserId();
+    fetchPlanApi(userId)
+      .then((data) => {
+        if (data && data.plan_content && !data.plan_content.startsWith("No active plan")) {
+          const planData = parsePlanResponse(data.plan_content);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: "saved-plan",
+              role: "assistant",
+              content: data.plan_content,
+              mode: "coach",
+              isPlan: true,
+              planData: planData || undefined,
+            },
+          ]);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const theme = {
     accent: mode === "coach" ? "emerald" : "red",
@@ -130,6 +155,11 @@ export default function CoachPage() {
 
       const planData = parsePlanResponse(replyText);
       const isPlan = planData !== null;
+
+      if (isPlan) {
+        const userId = getOrCreateUserId();
+        savePlanApi(userId, replyText).catch(() => {});
+      }
 
       const newAiMsg: Message = {
         id: (Date.now() + 1).toString(),

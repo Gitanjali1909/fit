@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import coach, logs, food, score, adaptive
+from routes import coach, logs, food, score, adaptive, plan
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -20,3 +20,4 @@ app.include_router(food.router, prefix="/food")
 app.include_router(logs.router)
 app.include_router(score.router)
 app.include_router(adaptive.router)
+app.include_router(plan.router)

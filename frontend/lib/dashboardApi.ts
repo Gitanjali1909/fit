@@ -10,7 +10,7 @@ export interface DashboardData {
   plan_adjustment: string;
 }
 
-export const fetchDashboardData = async (userId: number = 1): Promise<DashboardData> => {
+export const fetchDashboardData = async (userId: string): Promise<DashboardData> => {
   const res = await fetch(`${API}/dashboard/${userId}`, {
     method: "GET",
     headers: {
@@ -26,29 +26,29 @@ export const fetchDashboardData = async (userId: number = 1): Promise<DashboardD
   return res.json();
 };
 
-export const fetchScoreApi = async (workout: any, food: any, activity: any) => {
+export const fetchScoreApi = async (workout: any, food: any, activity: any, userId: string) => {
   const res = await fetch(`${API}/score`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ workout, food, activity }),
+    body: JSON.stringify({ workout, food, activity, user_id: userId }),
   });
   return res.json();
 };
 
-export const fetchInsightApi = async (workout: any, food: any, activity: any, score?: number) => {
+export const fetchInsightApi = async (workout: any, food: any, activity: any, userId: string, score?: number) => {
   const res = await fetch(`${API}/insight`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ workout, food, activity, score }),
+    body: JSON.stringify({ workout, food, activity, score, user_id: userId }),
   });
   return res.json();
 };
 
-export const logWorkoutApi = async (userId: number, type: string, reps: number) => {
+export const logWorkoutApi = async (userId: string, type: string, reps: number) => {
   const res = await fetch(`${API}/log/workout`, {
     method: "POST",
     headers: {
@@ -59,7 +59,7 @@ export const logWorkoutApi = async (userId: number, type: string, reps: number) 
   return res.json();
 };
 
-export const logFoodApi = async (userId: number, foodName: string, calories: number) => {
+export const logFoodApi = async (userId: string, foodName: string, calories: number) => {
   const res = await fetch(`${API}/log/food`, {
     method: "POST",
     headers: {
@@ -71,7 +71,7 @@ export const logFoodApi = async (userId: number, foodName: string, calories: num
 };
 
 export const logActivityApi = async (
-  userId: number,
+  userId: string,
   activityType: string,
   duration: number,
   steps?: number,
@@ -89,6 +89,29 @@ export const logActivityApi = async (
       steps,
       calories_burned: caloriesBurned,
     }),
+  });
+  return res.json();
+};
+
+// Plan persistence methods
+export const savePlanApi = async (userId: string, planContent: string) => {
+  const res = await fetch(`${API}/plan/save`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ user_id: userId, plan_content: planContent }),
+  });
+  return res.json();
+};
+
+export const fetchPlanApi = async (userId: string) => {
+  const res = await fetch(`${API}/plan/${userId}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
   });
   return res.json();
 };

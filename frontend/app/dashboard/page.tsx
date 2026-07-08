@@ -8,6 +8,7 @@ import {
   logActivityApi, 
   DashboardData 
 } from "@/lib/dashboardApi";
+import { getOrCreateUserId } from "@/lib/user";
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -36,7 +37,8 @@ export default function DashboardPage() {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const res = await fetchDashboardData(1); // Default to user ID 1
+      const userId = getOrCreateUserId();
+      const res = await fetchDashboardData(userId); 
       setData(res);
       setError(null);
     } catch (err) {
@@ -57,7 +59,8 @@ export default function DashboardPage() {
 
     try {
       setLogStatus("Logging...");
-      await logWorkoutApi(1, workoutType.trim(), repsNum);
+      const userId = getOrCreateUserId();
+      await logWorkoutApi(userId, workoutType.trim(), repsNum);
       setLogStatus("Workout logged!");
       setWorkoutType("");
       setWorkoutReps("");
@@ -75,7 +78,8 @@ export default function DashboardPage() {
 
     try {
       setLogStatus("Logging...");
-      await logFoodApi(1, foodName.trim(), calsNum);
+      const userId = getOrCreateUserId();
+      await logFoodApi(userId, foodName.trim(), calsNum);
       setLogStatus("Food logged!");
       setFoodName("");
       setFoodCalories("");
@@ -97,7 +101,8 @@ export default function DashboardPage() {
 
     try {
       setLogStatus("Logging...");
-      await logActivityApi(1, finalType, durationNum, stepsNum, calsNum);
+      const userId = getOrCreateUserId();
+      await logActivityApi(userId, finalType, durationNum, stepsNum, calsNum);
       setLogStatus("Activity logged!");
       setActivityDuration("");
       setActivitySteps("");

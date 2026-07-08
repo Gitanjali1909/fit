@@ -3,6 +3,8 @@ from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Setup Groq client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 SYSTEM_PROMPT = """
@@ -12,12 +14,24 @@ You can roast lazy users lightly.
 Keep answers short.
 """
 
-def ask_coach(message: str):
+def ask_coach(message: str, user_context: dict = None, mode: str = "coach"):
+    system_instruction = SYSTEM_PROMPT
+    if mode == "roast":
+        system_instruction = (
+            "You are a strict, savage fitness coach in ROAST MODE. "
+            "Insult the user's lazy traits humorously based on their context "
+            "while giving short, funny advice. Keep it to 1-2 lines."
+        )
+
+    context_str = ""
+    if user_context:
+        context_str = f"\nUser Context/Stats today: {user_context}\n"
+
     try:
         chat = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": message},
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": f"{context_str}User message: {message}"},
             ],
             model="llama3-8b-8192"
         )

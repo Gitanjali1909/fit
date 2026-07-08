@@ -7,12 +7,13 @@ from typing import Optional
 from db.session import get_db
 from db.models import FoodLog
 from services.nutrition_service import analyze_food_ai
+from services.db_service import ensure_user_exists
 
 router = APIRouter()
 
 class FoodAnalyzeRequest(BaseModel):
     food: str
-    user_id: Optional[int] = 1
+    user_id: Optional[str] = "1"
 
 @router.post("/analyze")
 async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
@@ -20,7 +21,9 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
     result = analyze_food_ai(req.food)
 
     # 2. Log to Database under user_id
-    user_id = req.user_id or 1
+    user_id = req.user_id or "1"
+    ensure_user_exists(db, user_id)
+    
     food_log = FoodLog(
         user_id=user_id,
         food_name=result.get("food", req.food),

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { API } from "@/lib/api";
+import { getOrCreateUserId } from "@/lib/user";
 
 interface NutritionResult {
   food: string;
@@ -28,12 +29,13 @@ export default function FoodPage() {
     setResult(null);
 
     try {
+      const userId = getOrCreateUserId();
       const res = await fetch(`${API}/food/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ food: foodInput.trim(), user_id: 1 }),
+        body: JSON.stringify({ food: foodInput.trim(), user_id: userId }),
       });
 
       if (!res.ok) {

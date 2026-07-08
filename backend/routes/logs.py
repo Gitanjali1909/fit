@@ -6,24 +6,26 @@ from datetime import date
 from typing import Optional
 
 from db.session import get_db
-from db.models import Workout, FoodLog, ActivityLog, User
+from db.models import Workout, FoodLog, ActivityLog, User, ScoreLog
 from services.score_service import calculate_score
 from services.ai_service import generate_daily_insight, generate_adaptive_insight
 from services.adaptive_service import analyze_user, adjust_plan
+from services.db_service import ensure_user_exists
 
 router = APIRouter()
+
 class WorkoutCreate(BaseModel):
-    user_id: int
+    user_id: str
     type: str
     reps: int
 
 class FoodCreate(BaseModel):
-    user_id: int
+    user_id: str
     food_name: str
     calories: int
 
 class ActivityCreate(BaseModel):
-    user_id: int
+    user_id: str
     activity_type: str
     duration: int
     steps: Optional[int] = None
@@ -32,6 +34,7 @@ class ActivityCreate(BaseModel):
 
 @router.post("/log/workout")
 async def log_workout(req: WorkoutCreate, db: Session = Depends(get_db)):
+    ensure_user_exists(db, req.user_id)
     workout = Workout(
         user_id=req.user_id,
         type=req.type,
@@ -46,6 +49,7 @@ async def log_workout(req: WorkoutCreate, db: Session = Depends(get_db)):
 
 @router.post("/log/food")
 async def log_food(req: FoodCreate, db: Session = Depends(get_db)):
+    ensure_user_exists(db, req.user_id)
     food = FoodLog(
         user_id=req.user_id,
         food_name=req.food_name,
@@ -60,6 +64,7 @@ async def log_food(req: FoodCreate, db: Session = Depends(get_db)):
 
 @router.post("/log/activity")
 async def log_activity(req: ActivityCreate, db: Session = Depends(get_db)):
+    ensure_user_exists(db, req.user_id)
     activity = ActivityLog(
         user_id=req.user_id,
         activity_type=req.activity_type,
@@ -75,8 +80,9 @@ async def log_activity(req: ActivityCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/dashboard/{user_id}")
-async def get_dashboard(user_id: int, db: Session = Depends(get_db)):
+async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     today = date.today()
+    ensure_user_exists(db, user_id)
 
     # Aggregate today's metrics
     calories_in = db.query(func.sum(FoodLog.calories)).filter(
@@ -104,11 +110,6 @@ async def get_dashboard(user_id: int, db: Session = Depends(get_db)):
         ActivityLog.date == today
     ).scalar() or 0
 
-    total_duration = db.query(func.sum(ActivityLog.duration)).filter(
-        ActivityLog.user_id == user_id,
-        ActivityLog.date == today
-    ).scalar() or 0
-
     # Fallbacks for empty days to keep the dashboard populated
     display_calories_in = 1500 if calories_in == 0 else calories_in
     display_calories_burned = 600 if calories_burned == 0 else calories_burned
@@ -121,6 +122,18 @@ async def get_dashboard(user_id: int, db: Session = Depends(get_db)):
 
     # Calculate real-time score out of 100
     daily_score = calculate_score(workout_payload, food_payload, activity_payload)
+
+    # Save calculated score to DB
+    score_log = db.query(ScoreLog).filter(
+        ScoreLog.user_id == user_id,
+        ScoreLog.date == today
+    ).first()
+    if score_log:
+        score_log.score = daily_score
+    else:
+        score_log = ScoreLog(user_id=user_id, score=daily_score, date=today)
+        db.add(score_log)
+    db.commit()
 
     # Prepare data payload for the adaptive behavior engine
     adaptive_payload = {
@@ -137,11 +150,20 @@ async def get_dashboard(user_id: int, db: Session = Depends(get_db)):
     ai_insight = generate_adaptive_insight(adaptive_payload)
 
     return {
+        # Frontend-backward-compatible properties
         "today_calories_in": display_calories_in,
         "today_calories_burned": display_calories_burned,
         "workouts_done": display_workouts_done,
         "activity_score": daily_score,
         "ai_insight": ai_insight,
         "adaptive_insights": insights,
-        "plan_adjustment": plan_update
+        "plan_adjustment": plan_update,
+        
+        # Spec-compliant properties
+        "calories_in": display_calories_in,
+        "calories_out": display_calories_burned,
+        "steps": total_steps,
+        "reps": total_reps,
+        "score": daily_score,
+        "insight": ai_insight
     }
