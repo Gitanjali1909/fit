@@ -78,8 +78,8 @@ export default function WorkoutPage() {
           </svg>
         </div>
         <div>
-          <h1 className="text-xs font-semibold uppercase tracking-widest text-white">Workout Vision</h1>
-          <p className="text-[9px] text-gray-500 font-medium uppercase tracking-wider">Squat Detection Protocol</p>
+          <h1 className="text-xs font-semibold uppercase tracking-widest text-white">Workout Tracker</h1>
+          <p className="text-[9px] text-gray-500 font-medium uppercase tracking-wider">Tracking Active</p>
         </div>
       </div>
 
@@ -133,7 +133,7 @@ export default function WorkoutPage() {
 
           {/* Knee Angles Data Panel */}
           <div className="bg-white/5 border border-white/10 p-5 rounded-xl shadow-sm">
-            <span className="text-[9px] text-gray-400 uppercase tracking-widest font-black mb-3.5 block">Joint Angles Matrix</span>
+            <span className="text-[9px] text-gray-400 tracking-widest font-black mb-3.5 block uppercase">Posture Tracker</span>
             
             <div className="space-y-4">
               {/* Left Knee */}

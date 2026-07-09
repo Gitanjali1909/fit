@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<boolean>(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   // Quick Log tabs
   const [activeLogTab, setActiveLogTab] = useState<"workout" | "food" | "activity" | null>(null);
@@ -140,6 +141,11 @@ export default function DashboardPage() {
   const dailySteps = data ? data.steps : 0;
   const hasData = data && data.has_data;
 
+  // Score breakdown calculations
+  const workoutPoints = workoutsCount > 0 ? 30 : 0;
+  const burnPoints = Math.round(Math.min((calsOut / 500) * 40, 40));
+  const loggingPoints = (calsOut > 0 || dailySteps > 0) ? 30 : 0;
+
   return (
     <div className="flex flex-col gap-3 w-full max-w-3xl mx-auto px-4">
       {/* TOP HEADER / GREETINGS */}
@@ -197,39 +203,71 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* Daily Fitness Score */}
-          <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md flex items-center justify-between relative overflow-hidden shadow-none">
-            <div className="space-y-1.5">
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Daily Fitness Score</span>
-              <div className="flex items-baseline gap-0.5">
-                <span className="text-5xl font-black font-mono text-emerald-400 tracking-tighter leading-none">
-                  {score}
-                </span>
-                <span className="text-xs text-gray-500 font-bold">/100</span>
+          <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md relative overflow-hidden shadow-none flex flex-col gap-4">
+            <div className="flex items-center justify-between w-full">
+              <div className="space-y-1.5">
+                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Daily Fitness Score</span>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-5xl font-black font-mono text-emerald-400 leading-none">
+                    {score}
+                  </span>
+                  <span className="text-xs text-gray-500 font-bold">/100</span>
+                </div>
+                <p className="text-[10px] text-gray-400 max-w-[220px] leading-relaxed">
+                  {score >= 80 
+                    ? "Outstanding performance! You are on track to crush your fitness goals."
+                    : "Keep moving! Every step, rep, and healthy meal helps boost your score."}
+                </p>
               </div>
-              <p className="text-[10px] text-gray-400 max-w-[220px] leading-relaxed">
-                {score >= 80 
-                  ? "Outstanding performance! You are on track to crush your fitness goals."
-                  : "Keep moving! Every step, rep, and healthy meal helps boost your score."}
-              </p>
+
+              {/* Progress Circle SVG */}
+              <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.03)" strokeWidth="5.5" fill="transparent" />
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="32"
+                    stroke="#10b981"
+                    strokeWidth="5.5"
+                    fill="transparent"
+                    strokeDasharray="201"
+                    strokeDashoffset={201 - (201 * (score / 100))}
+                    className="transition-all duration-700 ease-out"
+                  />
+                </svg>
+                <span className="absolute text-[9px] font-bold text-gray-450 uppercase tracking-widest">Score</span>
+              </div>
             </div>
 
-            {/* Progress Circle SVG */}
-            <div className="relative w-20 h-20 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.03)" strokeWidth="5.5" fill="transparent" />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="32"
-                  stroke="#10b981"
-                  strokeWidth="5.5"
-                  fill="transparent"
-                  strokeDasharray="201"
-                  strokeDashoffset={201 - (201 * (score / 100))}
-                  className="transition-all duration-700 ease-out"
-                />
-              </svg>
-              <span className="absolute text-[9px] font-bold text-gray-455 uppercase tracking-widest">Score</span>
+            {/* Score Breakdown Dropdown Panel */}
+            <div className="border-t border-white/10 pt-3">
+              <button 
+                onClick={() => setShowBreakdown(!showBreakdown)}
+                className="text-[9px] text-emerald-450 hover:text-emerald-400 font-bold uppercase tracking-widest flex items-center gap-1.5 select-none cursor-pointer transition-colors"
+              >
+                <span>{showBreakdown ? "Hide Score Breakdown ▲" : "Show Score Breakdown ▼"}</span>
+              </button>
+
+              {showBreakdown && (
+                <div className="mt-3 text-[10px] text-gray-400 space-y-2 animate-slideUp">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1.5">
+                    <span className="flex items-center gap-1.5">🏋️ Workout Volume</span>
+                    <span className="font-mono text-white font-bold">+{workoutPoints} pts</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1.5">
+                    <span className="flex items-center gap-1.5">🏃 Calorie Burn (MET-based)</span>
+                    <span className="font-mono text-white font-bold">+{burnPoints} pts</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-0.5">
+                    <span className="flex items-center gap-1.5">📝 Log Consistency</span>
+                    <span className="font-mono text-white font-bold">+{loggingPoints} pts</span>
+                  </div>
+                  <p className="text-[9px] text-gray-500 pt-1 leading-normal italic">
+                    Breakdown rules: Workout logged = 30 pts; Activity/Steps logged = 30 pts; Calorie burn vs 500 kcal target = up to 40 pts.
+                  </p>
+                </div>
+              )}
             </div>
           </section>
 

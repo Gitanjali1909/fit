@@ -71,8 +71,8 @@ export default function FoodPage() {
           </svg>
         </div>
         <div>
-          <h1 className="text-xs font-semibold uppercase tracking-widest text-white">Food Intelligence</h1>
-          <p className="text-[9px] text-gray-500 font-medium uppercase tracking-wider">AI Calorie & Nutrition Estimation</p>
+          <h1 className="text-xs font-semibold uppercase tracking-widest text-white">Food Scanner</h1>
+          <p className="text-[9px] text-gray-500 font-medium uppercase tracking-wider">Nutrition Calculator</p>
         </div>
       </div>
 
@@ -113,7 +113,7 @@ export default function FoodPage() {
       </section>
 
       {error && (
-        <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-lg text-center text-xs text-red-400">
+        <div className="p-3 bg-red-955/20 border border-red-900/30 rounded-lg text-center text-xs text-red-400">
           {error}
         </div>
       )}
@@ -127,7 +127,7 @@ export default function FoodPage() {
               <h2 className="text-sm font-semibold text-white capitalize mt-0.5">{result.food}</h2>
             </div>
             <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-bold px-2 py-0.5 rounded-lg border border-emerald-500/20 uppercase tracking-wider">
-              Logged to DB
+              Food Tracked
             </span>
           </div>
 
