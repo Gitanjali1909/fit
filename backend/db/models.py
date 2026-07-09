@@ -3,10 +3,11 @@ from sqlalchemy.orm import relationship
 from datetime import date
 from db.session import Base, engine
 
+
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(String, primary_key=True, index=True)  # UUID string from frontend localStorage
+    id = Column(String, primary_key=True, index=True)  # UUID from frontend
     name = Column(String, index=True, nullable=True)
     age = Column(Integer, nullable=True)
     weight = Column(Float, nullable=True)
@@ -23,11 +24,11 @@ class User(Base):
 class Workout(Base):
     __tablename__ = "workouts"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True)  # FIXED
     user_id = Column(String, ForeignKey("users.id"))
-    type = Column(String)  # pushup, squat, etc.
+    type = Column(String)
     reps = Column(Integer)
-    date = Column(Date, default=date.today)
+    date = Column(Date, default=lambda: date.today())
 
     user = relationship("User", back_populates="workouts")
 
@@ -42,7 +43,7 @@ class FoodLog(Base):
     protein = Column(Integer, default=0)
     carbs = Column(Integer, default=0)
     fat = Column(Integer, default=0)
-    date = Column(Date, default=date.today)
+    date = Column(Date, default=lambda: date.today())
 
     user = relationship("User", back_populates="food_logs")
 
@@ -52,11 +53,11 @@ class ActivityLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
-    activity_type = Column(String)  # walk, run, manual
-    duration = Column(Integer)  # minutes
+    activity_type = Column(String)
+    duration = Column(Integer)
     steps = Column(Integer, nullable=True)
     calories_burned = Column(Integer)
-    date = Column(Date, default=date.today)
+    date = Column(Date, default=lambda: date.today())
 
     user = relationship("User", back_populates="activity_logs")
 
@@ -67,7 +68,7 @@ class ScoreLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
     score = Column(Integer)
-    date = Column(Date, default=date.today)
+    date = Column(Date, default=lambda: date.today())
 
     user = relationship("User", back_populates="scores")
 
@@ -78,10 +79,8 @@ class PlanLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
     plan_content = Column(String)
-    date = Column(Date, default=date.today)
+    date = Column(Date, default=lambda: date.today())
 
     user = relationship("User", back_populates="plans")
 
-
-# Create tables in database
 Base.metadata.create_all(bind=engine)
