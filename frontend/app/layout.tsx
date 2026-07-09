@@ -1,4 +1,5 @@
 import "./globals.css";
+import BottomNav from "@/components/BottomNav";
 
 export const metadata = {
   title: "Fit",
@@ -11,17 +12,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-black text-white">
-        <nav className="p-4 border-b border-gray-800 flex gap-4">
-          <a href="/">Home</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/coach">Coach</a>
-          <a href="/workout">Workout</a>
-          <a href="/food">Food</a>
-        </nav>
+    <html lang="en" className="h-full bg-black">
+      <body className="h-full bg-black text-white antialiased selection:bg-emerald-500/25">
+        <div className="min-h-screen bg-gradient-to-b from-black via-zinc-900 to-black text-white flex flex-col">
+          {/* Main Content Area */}
+          <main className="w-full max-w-4xl mx-auto px-4 pt-6 pb-24 flex flex-col gap-4 flex-1">
+            {children}
+          </main>
 
-        <main className="p-4">{children}</main>
+          {/* Global Bottom Navigation */}
+          <BottomNav />
+        </div>
       </body>
     </html>
   );

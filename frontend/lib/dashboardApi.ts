@@ -8,6 +8,13 @@ export interface DashboardData {
   ai_insight: string;
   adaptive_insights: string[];
   plan_adjustment: string;
+  steps: number;
+  reps: number;
+  score: number;
+  insight: string;
+  calories_in: number;
+  calories_out: number;
+  has_data?: boolean;
 }
 
 export const fetchDashboardData = async (userId: string): Promise<DashboardData> => {

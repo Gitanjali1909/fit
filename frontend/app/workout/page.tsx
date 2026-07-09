@@ -69,27 +69,22 @@ export default function WorkoutPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#030303] text-gray-250 font-sans selection:bg-emerald-500/20 relative overflow-hidden pb-16">
-      {/* Subtle top glow */}
-      <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent filter blur-3xl pointer-events-none"></div>
-
+    <div className="flex flex-col gap-4 w-full">
       {/* HEADER */}
-      <header className="flex items-center justify-between px-6 py-4 bg-[#080808]/90 backdrop-blur-md border-b border-white/5 sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 animate-pulse">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-xs font-semibold uppercase tracking-widest text-white">Workout Vision</h1>
-            <p className="text-[9px] text-gray-500 font-medium uppercase tracking-wider">Squat Detection Protocol</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 animate-pulse">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
         </div>
-      </header>
+        <div>
+          <h1 className="text-xs font-semibold uppercase tracking-widest text-white">Workout Vision</h1>
+          <p className="text-[9px] text-gray-500 font-medium uppercase tracking-wider">Squat Detection Protocol</p>
+        </div>
+      </div>
 
-      {/* MAIN LAYOUT */}
-      <main className="max-w-4xl mx-auto w-full px-4 sm:px-6 mt-8 flex flex-col md:flex-row gap-6 justify-center items-stretch z-10">
+      {/* MAIN BODY */}
+      <div className="flex flex-col md:flex-row gap-4 justify-center items-stretch w-full">
         
         {/* Left Side: Camera Container */}
         <section className="flex-1 flex flex-col justify-between gap-4">
@@ -112,9 +107,9 @@ export default function WorkoutPage() {
         <section className="w-full md:w-80 flex flex-col gap-4">
           
           {/* Big Reps Counter Card */}
-          <div className="bg-[#080808] border border-white/5 p-6 rounded-2xl flex flex-col justify-between items-center text-center shadow-md flex-1 min-h-[220px]">
+          <div className="bg-white/5 border border-white/10 p-6 rounded-xl flex flex-col justify-between items-center text-center shadow-md flex-1 min-h-[200px]">
             <div>
-              <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Squat reps</span>
+              <span className="text-[9px] text-gray-400 uppercase tracking-widest font-black">Squat reps</span>
               <div className="mt-4 flex items-baseline justify-center">
                 <span className="text-7xl font-black font-mono text-white tracking-tighter leading-none">
                   {squatState.reps}
@@ -122,13 +117,13 @@ export default function WorkoutPage() {
               </div>
             </div>
 
-            <div className="w-full mt-4 border-t border-white/5 pt-4">
+            <div className="w-full mt-4 border-t border-white/10 pt-4">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-500 font-semibold uppercase tracking-wider text-[10px]">Position State</span>
                 <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
                   squatState.stage === "down" 
                     ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
-                    : "bg-white/5 text-gray-400 border border-white/5"
+                    : "bg-white/5 text-gray-400 border border-white/10"
                 }`}>
                   {squatState.stage === "down" ? "Squatting (Bent)" : "Standing (Up)"}
                 </span>
@@ -137,14 +132,14 @@ export default function WorkoutPage() {
           </div>
 
           {/* Knee Angles Data Panel */}
-          <div className="bg-[#080808] border border-white/5 p-5 rounded-2xl shadow-sm">
-            <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black mb-3.5 block">Joint Angles Matrix</span>
+          <div className="bg-white/5 border border-white/10 p-5 rounded-xl shadow-sm">
+            <span className="text-[9px] text-gray-400 uppercase tracking-widest font-black mb-3.5 block">Joint Angles Matrix</span>
             
             <div className="space-y-4">
               {/* Left Knee */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-gray-400">Left Knee angle</span>
+                  <span className="text-gray-450">Left Knee angle</span>
                   <span className="font-mono text-white">{kneeAngles.left}°</span>
                 </div>
                 <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -158,7 +153,7 @@ export default function WorkoutPage() {
               {/* Right Knee */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-gray-400">Right Knee angle</span>
+                  <span className="text-gray-450">Right Knee angle</span>
                   <span className="font-mono text-white">{kneeAngles.right}°</span>
                 </div>
                 <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -170,14 +165,14 @@ export default function WorkoutPage() {
               </div>
             </div>
 
-            <div className="text-[9px] text-gray-500 leading-normal border-t border-white/5 pt-3.5 mt-4">
+            <div className="text-[9px] text-gray-500 leading-normal border-t border-white/10 pt-3.5 mt-4">
               Tip: Standard squats require you to drop your hips until knees bend past <span className="text-emerald-400 font-bold">110°</span>, then return to a fully straight standing posture (<span className="text-emerald-400 font-bold">&gt; 160°</span>).
             </div>
           </div>
 
         </section>
 
-      </main>
+      </div>
     </div>
   );
 }

@@ -29,7 +29,7 @@ class ActivityCreate(BaseModel):
     activity_type: str
     duration: int
     steps: Optional[int] = None
-    calories_burned: int
+    calories_burned: Optional[int] = None
 
 
 @router.post("/log/workout")
@@ -64,19 +64,45 @@ async def log_food(req: FoodCreate, db: Session = Depends(get_db)):
 
 @router.post("/log/activity")
 async def log_activity(req: ActivityCreate, db: Session = Depends(get_db)):
-    ensure_user_exists(db, req.user_id)
+    user = ensure_user_exists(db, req.user_id)
+
+    # Constant MET calculation map
+    MET_MAP = {
+        "walk": 3.5,
+        "run": 7.0,
+        "cycling": 6.0,
+        "skipping": 8.0,
+        "other": 4.0
+    }
+
+    activity_key = req.activity_type.lower().strip()
+    met = MET_MAP.get(activity_key, 4.0)
+
+    # MET calculation: calories = MET * weight(kg) * duration(hours)
+    user_weight = user.weight or 70.0
+    duration_hours = req.duration / 60.0
+    calories = req.calories_burned
+
+    if calories is None or calories == 0:
+        calories = int(met * user_weight * duration_hours)
+
     activity = ActivityLog(
         user_id=req.user_id,
         activity_type=req.activity_type,
         duration=req.duration,
         steps=req.steps,
-        calories_burned=req.calories_burned,
+        calories_burned=calories,
         date=date.today()
     )
     db.add(activity)
     db.commit()
     db.refresh(activity)
-    return {"status": "success", "message": "Activity logged", "id": activity.id}
+    return {
+        "status": "success", 
+        "message": "Activity logged", 
+        "id": activity.id,
+        "calories_burned": calories
+    }
 
 
 @router.get("/dashboard/{user_id}")
@@ -84,7 +110,7 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     today = date.today()
     ensure_user_exists(db, user_id)
 
-    # Aggregate today's metrics
+    # 1. Query today's raw totals directly from database
     calories_in = db.query(func.sum(FoodLog.calories)).filter(
         FoodLog.user_id == user_id,
         FoodLog.date == today
@@ -110,20 +136,38 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         ActivityLog.date == today
     ).scalar() or 0
 
-    # Fallbacks for empty days to keep the dashboard populated
-    display_calories_in = 1500 if calories_in == 0 else calories_in
-    display_calories_burned = 600 if calories_burned == 0 else calories_burned
-    display_workouts_done = 2 if workouts_done == 0 else workouts_done
+    # 2. Check if any data has been logged today (if not, show empty state with no fake numbers)
+    has_logs = (calories_in > 0) or (calories_burned > 0) or (workouts_done > 0) or (total_steps > 0)
 
-    # Prepare data payloads for the score system
-    workout_payload = {"reps": total_reps or 30}  # default reps for score calc if empty
-    food_payload = {"calories": display_calories_in}
-    activity_payload = {"steps": total_steps or 5000}
+    if not has_logs:
+        return {
+            "today_calories_in": 0,
+            "today_calories_burned": 0,
+            "workouts_done": 0,
+            "activity_score": 0,
+            "ai_insight": None,
+            "adaptive_insights": [],
+            "plan_adjustment": None,
+            
+            # Spec-compliant properties
+            "calories_in": 0,
+            "calories_out": 0,
+            "steps": 0,
+            "reps": 0,
+            "score": 0,
+            "insight": None,
+            "has_data": False
+        }
 
-    # Calculate real-time score out of 100
-    daily_score = calculate_score(workout_payload, food_payload, activity_payload)
+    # 3. Calculate Score using the formula:
+    # score = (calories_burned / goal_burn) * 40 + (workout_done ? 30 : 0) + (activity_logged ? 30 : 0)
+    goal_burn = 500.0  # target daily calorie burn threshold
+    burn_points = min((calories_burned / goal_burn) * 40.0, 40.0)
+    workout_points = 30.0 if workouts_done > 0 else 0.0
+    activity_points = 30.0 if (calories_burned > 0 or total_steps > 0) else 0.0
+    daily_score = int(burn_points + workout_points + activity_points)
 
-    # Save calculated score to DB
+    # 4. Save calculated score to DB
     score_log = db.query(ScoreLog).filter(
         ScoreLog.user_id == user_id,
         ScoreLog.date == today
@@ -135,35 +179,34 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         db.add(score_log)
     db.commit()
 
-    # Prepare data payload for the adaptive behavior engine
+    # 5. Run adaptive planning engine
     adaptive_payload = {
-        "steps": total_steps or 5000,
-        "calories": display_calories_in,
-        "workouts": display_workouts_done
+        "steps": total_steps,
+        "calories": calories_in,
+        "workouts": workouts_done
     }
-
-    # Run behavior analysis and recommend plan adjustments
     insights = analyze_user(adaptive_payload)
     plan_update = adjust_plan(insights)
 
-    # Generate adaptive insights using Groq
+    # 6. Generate dynamic AI advice using Groq
     ai_insight = generate_adaptive_insight(adaptive_payload)
 
     return {
         # Frontend-backward-compatible properties
-        "today_calories_in": display_calories_in,
-        "today_calories_burned": display_calories_burned,
-        "workouts_done": display_workouts_done,
+        "today_calories_in": calories_in,
+        "today_calories_burned": calories_burned,
+        "workouts_done": workouts_done,
         "activity_score": daily_score,
         "ai_insight": ai_insight,
         "adaptive_insights": insights,
         "plan_adjustment": plan_update,
         
         # Spec-compliant properties
-        "calories_in": display_calories_in,
-        "calories_out": display_calories_burned,
+        "calories_in": calories_in,
+        "calories_out": calories_burned,
         "steps": total_steps,
         "reps": total_reps,
         "score": daily_score,
-        "insight": ai_insight
-    }
+        "insight": ai_insight,
+        "has_data": True
+      }
