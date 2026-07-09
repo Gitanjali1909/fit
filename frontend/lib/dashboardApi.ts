@@ -1,5 +1,25 @@
 import { API } from "./api";
 
+export interface WorkoutLogItem {
+  type: string;
+  reps: number;
+  id: number;
+}
+
+export interface FoodLogItem {
+  food_name: string;
+  calories: number;
+  id: number;
+}
+
+export interface ActivityLogItem {
+  activity_type: string;
+  duration: number;
+  steps: number | null;
+  calories_burned: number;
+  id: number;
+}
+
 export interface DashboardData {
   today_calories_in: number;
   today_calories_burned: number;
@@ -15,6 +35,9 @@ export interface DashboardData {
   calories_in: number;
   calories_out: number;
   has_data?: boolean;
+  workouts: WorkoutLogItem[];
+  food: FoodLogItem[];
+  activity: ActivityLogItem[];
 }
 
 export const fetchDashboardData = async (userId: string): Promise<DashboardData> => {
@@ -119,6 +142,17 @@ export const fetchPlanApi = async (userId: string) => {
       "Content-Type": "application/json",
     },
     cache: "no-store",
+  });
+  return res.json();
+};
+
+export const resetTodayApi = async (userId: string) => {
+  const res = await fetch(`${API}/reset-today`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ user_id: userId }),
   });
   return res.json();
 };

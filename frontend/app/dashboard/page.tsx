@@ -6,6 +6,7 @@ import {
   logWorkoutApi, 
   logFoodApi, 
   logActivityApi, 
+  resetTodayApi,
   DashboardData 
 } from "@/lib/dashboardApi";
 import { getOrCreateUserId } from "@/lib/user";
@@ -50,6 +51,22 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  const handleResetToday = async () => {
+    if (!confirm("Are you sure you want to clear all logs recorded today? This cannot be undone.")) return;
+    try {
+      setLoading(true);
+      const userId = getOrCreateUserId();
+      await resetTodayApi(userId);
+      setLogStatus("Today's data reset!");
+      setTimeout(() => setLogStatus(null), 2000);
+      loadDashboard();
+    } catch (err) {
+      setLogStatus("Error resetting logs");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogWorkout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,10 +130,18 @@ export default function DashboardPage() {
     }
   };
 
+  // Safe aggregated value mapping
+  const score = data ? data.activity_score : 0;
+  const calsIn = data ? data.today_calories_in : 0;
+  const calsOut = data ? data.today_calories_burned : 0;
+  const netCals = calsIn - calsOut;
+  const workoutsCount = data ? data.workouts_done : 0;
+  const totalReps = data ? data.reps : 0;
+  const dailySteps = data ? data.steps : 0;
   const hasData = data && data.has_data;
 
   return (
-    <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto px-4">
+    <div className="flex flex-col gap-3 w-full max-w-3xl mx-auto px-4">
       {/* TOP HEADER / GREETINGS */}
       <div className="flex items-center justify-between">
         <div>
@@ -124,162 +149,192 @@ export default function DashboardPage() {
           <p className="text-[10px] text-gray-500 font-medium">Here is your daily fitness digest.</p>
         </div>
 
-        <button 
-          onClick={loadDashboard}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-lg text-xs font-semibold text-gray-300 transition-all select-none cursor-pointer disabled:opacity-50"
-        >
-          {loading ? (
-            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H12v9" />
-            </svg>
+        <div className="flex items-center gap-2">
+          {hasData && (
+            <button 
+              onClick={handleResetToday}
+              disabled={loading}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 active:scale-95 border border-red-500/20 rounded-xl text-[10px] font-semibold text-red-400 transition-all select-none cursor-pointer disabled:opacity-50"
+            >
+              Reset Today
+            </button>
           )}
-          Refresh
-        </button>
+
+          <button 
+            onClick={loadDashboard}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-lg text-xs font-semibold text-gray-300 transition-all select-none cursor-pointer disabled:opacity-50"
+          >
+            {loading ? (
+              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H12v9" />
+              </svg>
+            )}
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="bg-white/5 border border-white/10 rounded-xl p-5 text-center backdrop-blur-md shadow-none">
           <span className="text-2xl mb-2 block">📋</span>
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">No data yet</h3>
-          <p className="text-[11px] text-gray-500 mt-1">Start your first activity to update your score.</p>
+          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Connection status</h3>
+          <p className="text-[11px] text-gray-500 mt-1">Unable to load dashboard data. Check backend connection.</p>
         </div>
       )}
 
-      {/* SCORE SECTION */}
+      {/* CONDITIONAL RENDER: Empty state vs Real statistics */}
       {!hasData ? (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5 text-center backdrop-blur-md shadow-none">
-          <span className="text-xl mb-1.5 block select-none">📊</span>
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Daily Fitness Score</h3>
-          <p className="text-[11px] text-gray-500 mt-1">Complete your day to see your score.</p>
-        </div>
+        <section className="bg-white/5 border border-white/10 rounded-xl p-6 text-center backdrop-blur-md shadow-none flex flex-col items-center justify-center gap-2">
+          <span className="text-3xl mb-1 select-none">🎯</span>
+          <h3 className="text-sm font-bold text-white tracking-tight">No activity logged today</h3>
+          <p className="text-[11px] text-gray-500 max-w-xs leading-normal">
+            Start by adding your first workout, meal, or activity below.
+          </p>
+        </section>
       ) : (
-        <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md flex items-center justify-between relative overflow-hidden shadow-none">
-          <div className="space-y-1.5">
-            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Daily Fitness Score</span>
-            <div className="flex items-baseline gap-0.5">
-              <span className="text-5xl font-black font-mono text-emerald-400 tracking-tighter leading-none">
-                {data.activity_score}
-              </span>
-              <span className="text-xs text-gray-500 font-bold">/100</span>
-            </div>
-            <p className="text-[10px] text-gray-400 max-w-[220px] leading-relaxed">
-              {data.activity_score >= 80 
-                ? "Outstanding performance! You are on track to crush your fitness goals."
-                : "Keep moving! Every step, rep, and healthy meal helps boost your score."}
-            </p>
-          </div>
-
-          {/* Progress Circle SVG */}
-          <div className="relative w-20 h-20 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90">
-              <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.03)" strokeWidth="5.5" fill="transparent" />
-              <circle
-                cx="40"
-                cy="40"
-                r="32"
-                stroke="#10b981"
-                strokeWidth="5.5"
-                fill="transparent"
-                strokeDasharray="201"
-                strokeDashoffset={201 - (201 * (data.activity_score / 100))}
-                className="transition-all duration-700 ease-out"
-              />
-            </svg>
-            <span className="absolute text-[9px] font-bold text-gray-450 uppercase tracking-widest">Score</span>
-          </div>
-        </section>
-      )}
-
-      {/* METRICS GRID */}
-      {hasData && (
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          
-          {/* Calories Card */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Calories Balance</span>
-              <span className="text-xs">🍱</span>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-0.5 mt-2">
-                <span className="text-3xl font-bold font-mono text-white">
-                  {data.today_calories_in - data.today_calories_burned}
+        <>
+          {/* Daily Fitness Score */}
+          <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md flex items-center justify-between relative overflow-hidden shadow-none">
+            <div className="space-y-1.5">
+              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Daily Fitness Score</span>
+              <div className="flex items-baseline gap-0.5">
+                <span className="text-5xl font-black font-mono text-emerald-400 tracking-tighter leading-none">
+                  {score}
                 </span>
-                <span className="text-[10px] text-gray-500 uppercase font-semibold">net kcal</span>
+                <span className="text-xs text-gray-500 font-bold">/100</span>
               </div>
-              <div className="flex justify-between text-[9px] text-gray-550 mt-2.5">
-                <span>In: {data.today_calories_in} kcal</span>
-                <span>Out: {data.today_calories_burned} kcal</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Workout Sessions</span>
-              <span className="text-xs">🏋️</span>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-0.5 mt-2">
-                <span className="text-3xl font-bold font-mono text-white">
-                  {data.workouts_done}
-                </span>
-                <span className="text-[10px] text-gray-500 uppercase font-semibold">completed</span>
-              </div>
-              <p className="text-[9px] text-gray-550 mt-2.5">
-                {data.reps > 0 ? `${data.reps} total reps logged today.` : "No reps logged today."}
+              <p className="text-[10px] text-gray-400 max-w-[220px] leading-relaxed">
+                {score >= 80 
+                  ? "Outstanding performance! You are on track to crush your fitness goals."
+                  : "Keep moving! Every step, rep, and healthy meal helps boost your score."}
               </p>
             </div>
-          </div>
 
-          {/* Steps/Activity Card */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Daily steps</span>
-              <span className="text-xs">🚶</span>
+            {/* Progress Circle SVG */}
+            <div className="relative w-20 h-20 flex items-center justify-center">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.03)" strokeWidth="5.5" fill="transparent" />
+                <circle
+                  cx="40"
+                  cy="40"
+                  r="32"
+                  stroke="#10b981"
+                  strokeWidth="5.5"
+                  fill="transparent"
+                  strokeDasharray="201"
+                  strokeDashoffset={201 - (201 * (score / 100))}
+                  className="transition-all duration-700 ease-out"
+                />
+              </svg>
+              <span className="absolute text-[9px] font-bold text-gray-455 uppercase tracking-widest">Score</span>
             </div>
-            <div>
-              <div className="flex items-baseline gap-0.5 mt-2">
-                <span className="text-3xl font-bold font-mono text-white">
-                  {data.steps || 0}
-                </span>
-                <span className="text-[10px] text-gray-500 uppercase font-semibold">steps</span>
+          </section>
+
+          {/* Metrics Grid */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            
+            {/* Calories Card */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Calories Balance</span>
+                <span className="text-xs">🍱</span>
               </div>
-              <p className="text-[9px] text-gray-550 mt-2.5">
-                Target: 8,000 steps baseline.
-              </p>
+              <div>
+                <div className="flex items-baseline gap-0.5 mt-2">
+                  <span className="text-3xl font-bold font-mono text-white">
+                    {netCals}
+                  </span>
+                  <span className="text-[10px] text-gray-500 uppercase font-semibold">net kcal</span>
+                </div>
+                <div className="flex justify-between text-[9px] text-gray-555 mt-2.5">
+                  <span>In: {calsIn} kcal</span>
+                  <span>Out: {calsOut} kcal</span>
+                </div>
+              </div>
             </div>
-          </div>
 
-        </section>
-      )}
-
-      {/* AI INSIGHT SECTION */}
-      {hasData && (data.ai_insight || data.plan_adjustment) && (
-        <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md space-y-4 relative overflow-hidden shadow-none">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">💡</span>
-            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">AI Insight of the Day</span>
-          </div>
-          
-          {data.ai_insight && (
-            <p className="text-xs text-gray-250 leading-relaxed italic">
-              "{data.ai_insight}"
-            </p>
-          )}
-
-          {data.plan_adjustment && (
-            <div className="border-t border-white/5 pt-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Adaptive Plan Update</span>
-              <span className="text-xs font-semibold text-white bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                {data.plan_adjustment}
-              </span>
+            {/* Workouts Card */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Workout Sessions</span>
+                <span className="text-xs">🏋️</span>
+              </div>
+              <div>
+                <div className="flex items-baseline gap-0.5 mt-2">
+                  <span className="text-3xl font-bold font-mono text-white">
+                    {workoutsCount}
+                  </span>
+                  <span className="text-[10px] text-gray-500 uppercase font-semibold">completed</span>
+                </div>
+                <p className="text-[9px] text-gray-555 mt-2.5">
+                  {totalReps > 0 ? `${totalReps} total reps logged today.` : "No reps logged today."}
+                </p>
+              </div>
             </div>
-          )}
-        </section>
+
+            {/* Steps/Activity Card */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Daily steps</span>
+                <span className="text-xs">🚶</span>
+              </div>
+              <div>
+                <div className="flex items-baseline gap-0.5 mt-2">
+                  <span className="text-3xl font-bold font-mono text-white">
+                    {dailySteps}
+                  </span>
+                  <span className="text-[10px] text-gray-500 uppercase font-semibold">steps</span>
+                </div>
+                <p className="text-[9px] text-gray-555 mt-2.5">
+                  Target: 8,000 steps baseline.
+                </p>
+              </div>
+            </div>
+
+          </section>
+
+          {/* Today's Logs Dynamic List */}
+          <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md space-y-3.5 shadow-none">
+            <div>
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">Today's Logs</h2>
+              <p className="text-[9px] text-gray-550 font-medium">Items you recorded today</p>
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              {data.workouts && data.workouts.map((w) => (
+                <div key={`w-${w.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs">
+                  <span className="font-semibold text-white">🏋️ {w.type}</span>
+                  <span className="text-gray-400 font-mono font-bold">{w.reps} reps</span>
+                </div>
+              ))}
+              
+              {data.food && data.food.map((f) => (
+                <div key={`f-${f.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs">
+                  <span className="font-semibold text-white">🍱 {f.food_name}</span>
+                  <span className="text-emerald-400 font-mono font-bold">+{f.calories} kcal</span>
+                </div>
+              ))}
+              
+              {data.activity && data.activity.map((a) => (
+                <div key={`a-${a.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs">
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-white">🏃 {a.activity_type}</span>
+                    {a.steps && a.steps > 0 ? (
+                      <span className="text-[9px] text-gray-500 mt-0.5">{a.steps} steps</span>
+                    ) : null}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-red-405 font-mono font-bold">-{a.calories_burned} kcal</span>
+                    <span className="block text-[9px] text-gray-500 mt-0.5">{a.duration} min</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
       )}
 
       {/* TACTILE LOGGER DRAWER */}
@@ -287,7 +342,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
           <div>
             <h2 className="text-xs font-bold text-white uppercase tracking-wider">Activity Logger</h2>
-            <p className="text-[9px] text-gray-550 font-medium">Log your meals, reps, and steps manually</p>
+            <p className="text-[9px] text-gray-555 font-medium">Log your meals, reps, and steps manually</p>
           </div>
           {logStatus && (
             <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-450 font-semibold px-2 py-0.5 rounded-lg">
@@ -328,7 +383,7 @@ export default function DashboardPage() {
                 value={workoutType}
                 onChange={(e) => setWorkoutType(e.target.value)}
                 placeholder="e.g. Squats, Pushups"
-                className="bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2 text-xs text-white outline-none transition-all placeholder:text-gray-650"
+                className="bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2 text-xs text-white outline-none transition-all placeholder:text-gray-655"
                 required
               />
             </div>
@@ -339,7 +394,7 @@ export default function DashboardPage() {
                 value={workoutReps}
                 onChange={(e) => setWorkoutReps(e.target.value)}
                 placeholder="e.g. 15"
-                className="bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2 text-xs text-white outline-none transition-all placeholder:text-gray-650 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2 text-xs text-white outline-none transition-all placeholder:text-gray-655 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 required
               />
             </div>
@@ -412,7 +467,7 @@ export default function DashboardPage() {
                   value={customActivityType}
                   onChange={(e) => setCustomActivityType(e.target.value)}
                   placeholder="Enter activity name"
-                  className="bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2 text-xs text-white outline-none transition-all placeholder:text-gray-600"
+                  className="bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2 text-xs text-white outline-none transition-all placeholder:text-gray-655"
                   required
                 />
               </div>
@@ -448,27 +503,6 @@ export default function DashboardPage() {
               Save Activity
             </button>
           </form>
-        )}
-
-        {/* Quick Suggestions */}
-        {!activeLogTab && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fadeIn">
-            {[
-              { label: "10 Squats", cat: "workout", action: () => { setWorkoutType("Squats"); setWorkoutReps("10"); setActiveLogTab("workout"); } },
-              { label: "Banana (105 kcal)", cat: "food", action: () => { setFoodName("Banana"); setFoodCalories("105"); setActiveLogTab("food"); } },
-              { label: "30-min walk", cat: "activity", action: () => { setActivityType("Walk"); setActivityDuration("30"); setActivitySteps("3500"); setActiveLogTab("activity"); } },
-              { label: "15 Pushups", cat: "workout", action: () => { setWorkoutType("Pushups"); setWorkoutReps("15"); setActiveLogTab("workout"); } }
-            ].map((item, idx) => (
-              <button
-                key={idx}
-                onClick={item.action}
-                className="p-3 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl text-left transition-all group flex flex-col justify-between h-16 shadow-none"
-              >
-                <span className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">{item.cat}</span>
-                <span className="text-[11px] font-semibold text-white group-hover:text-emerald-400 transition-colors">{item.label}</span>
-              </button>
-            ))}
-          </div>
         )}
       </section>
     </div>

@@ -156,10 +156,18 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
             "reps": 0,
             "score": 0,
             "insight": None,
-            "has_data": False
+            "has_data": False,
+            "workouts": [],
+            "food": [],
+            "activity": []
         }
 
-    # 3. Calculate Score using the formula:
+    # 3. Fetch today's detailed lists
+    workouts_list = db.query(Workout).filter(Workout.user_id == user_id, Workout.date == today).all()
+    food_list = db.query(FoodLog).filter(FoodLog.user_id == user_id, FoodLog.date == today).all()
+    activity_list = db.query(ActivityLog).filter(ActivityLog.user_id == user_id, ActivityLog.date == today).all()
+
+    # 4. Calculate Score using the formula:
     # score = (calories_burned / goal_burn) * 40 + (workout_done ? 30 : 0) + (activity_logged ? 30 : 0)
     goal_burn = 500.0  # target daily calorie burn threshold
     burn_points = min((calories_burned / goal_burn) * 40.0, 40.0)
@@ -167,7 +175,7 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     activity_points = 30.0 if (calories_burned > 0 or total_steps > 0) else 0.0
     daily_score = int(burn_points + workout_points + activity_points)
 
-    # 4. Save calculated score to DB
+    # 5. Save calculated score to DB
     score_log = db.query(ScoreLog).filter(
         ScoreLog.user_id == user_id,
         ScoreLog.date == today
@@ -179,7 +187,7 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         db.add(score_log)
     db.commit()
 
-    # 5. Run adaptive planning engine
+    # 6. Run adaptive planning engine
     adaptive_payload = {
         "steps": total_steps,
         "calories": calories_in,
@@ -188,7 +196,7 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     insights = analyze_user(adaptive_payload)
     plan_update = adjust_plan(insights)
 
-    # 6. Generate dynamic AI advice using Groq
+    # 7. Generate dynamic AI advice using Groq
     ai_insight = generate_adaptive_insight(adaptive_payload)
 
     return {
@@ -208,5 +216,10 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         "reps": total_reps,
         "score": daily_score,
         "insight": ai_insight,
-        "has_data": True
+        "has_data": True,
+        
+        # Lists
+        "workouts": [{"type": w.type, "reps": w.reps, "id": w.id} for w in workouts_list],
+        "food": [{"food_name": f.food_name, "calories": f.calories, "id": f.id} for f in food_list],
+        "activity": [{"activity_type": a.activity_type, "duration": a.duration, "steps": a.steps, "calories_burned": a.calories_burned, "id": a.id} for a in activity_list]
       }
