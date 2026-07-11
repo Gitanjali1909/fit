@@ -449,7 +449,7 @@ export default function FoodPage() {
               Analyze Another Meal
             </button>
             <p className="text-[9px] text-gray-550 text-center italic">
-              * Calories are AI-estimated, not exact.
+              * Calories are calculated using standard values.
             </p>
           </div>
         </section>

@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Setup Groq client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 SYSTEM_PROMPT_COACH = """
@@ -30,7 +29,7 @@ Your goals:
 - Keep your entire response under 4-5 lines maximum.
 """
 
-def ask_coach(message: str, user_context: dict = None, mode: str = "coach"):
+def ask_coach(message: str, user_context: dict = None, mode: str = "coach"): # type: ignore
     system_instruction = SYSTEM_PROMPT_COACH if mode == "coach" else SYSTEM_PROMPT_ROAST
 
     context_str = ""
@@ -43,7 +42,7 @@ def ask_coach(message: str, user_context: dict = None, mode: str = "coach"):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": f"{context_str}User message: {message}"},
             ],
-            model="llama3-8b-8192"
+            model="llama-3.3-70b-versatile"
         )
         return chat.choices[0].message.content
     except Exception as e:
@@ -65,7 +64,7 @@ def generate_daily_insight(data: dict):
                 {"role": "system", "content": "You are a strict, savage, and funny fitness coach. Provide a roasting but helpful fitness insight based on user data in 1-2 lines. Keep it extremely brief."},
                 {"role": "user", "content": prompt},
             ],
-            model="llama3-8b-8192",
+            model="llama-3.3-70b-versatile",
             max_tokens=60
         )
         return chat.choices[0].message.content.strip()
@@ -87,7 +86,7 @@ def generate_adaptive_insight(data: dict):
                 {"role": "system", "content": "You are a smart, professional fitness analyst. Give a short fitness insight + practical suggestion in 1-2 lines based on the user's steps, calories, and workouts today. Keep it brief and actionable."},
                 {"role": "user", "content": prompt},
             ],
-            model="llama3-8b-8192",
+            model="llama-3.3-70b-versatile",
             max_tokens=80
         )
         return chat.choices[0].message.content.strip()

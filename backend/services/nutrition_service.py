@@ -1,61 +1,80 @@
 import json
 import re
 import os
+from typing import List
 from groq import Groq
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 
 # Setup Groq client locally to avoid circular dependencies
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Standardized deterministic calories database
 CALORIE_MAP = {
     "egg": 70,
-    "eggs": 70,
-    "boiled egg": 70,
-    "boiled eggs": 70,
     "roti": 120,
-    "rotis": 120,
-    "chapati": 120,
-    "chapatis": 120,
     "rice": 130,
-    "cooked rice": 130,
     "paneer": 265,
-    "paneer sabzi": 265,
     "apple": 95,
-    "apples": 95,
     "banana": 105,
-    "bananas": 105,
     "milk": 60,
     "chicken": 165,
-    "chicken breast": 165,
     "protein shake": 150,
     "salad": 50,
-    "green salad": 50,
     "bread": 80,
-    "bread slice": 80,
     "butter": 100,
     "curd": 100,
-    "yogurt": 100,
     "oats": 150,
     "avocado": 160
 }
 
-# In-memory lookup cache to guarantee consistency for unknown foods
 DYNAMIC_CALORIE_CACHE = {}
 
-SYSTEM_INSTRUCTION = """You are a food identification AI.
-Your ONLY job is to identify the food items in the user's input (image description or text) and estimate their raw quantities.
-Do not calculate calories. Do not include descriptions.
+def normalize(name: str) -> str:
+    n = name.lower().strip()
+    if "egg" in n:
+        return "egg"
+    if "rice" in n:
+        return "rice"
+    if "roti" in n or "chapati" in n:
+        return "roti"
+    if "paneer" in n:
+        return "paneer"
+    if "apple" in n:
+        return "apple"
+    if "banana" in n:
+        return "banana"
+    if "milk" in n:
+        return "milk"
+    return n
 
-Output STRICT JSON matching this format:
+class FoodItem(BaseModel):
+    name: str
+    quantity: float
+    confidence: float = 1.0
+
+class FoodResponse(BaseModel):
+    items: List[FoodItem]
+
+SYSTEM_INSTRUCTION = """You are a strict food extraction API.
+
+You MUST return ONLY JSON.
+No explanation. No text. No extra keys.
+
+If unsure:
+- return empty list []
+
+Rules:
+- Identify only clearly visible food
+- Do NOT guess
+- Do NOT hallucinate
+- Do NOT estimate calories or nutrition
+
+Format:
 {
   "items": [
-    {
-      "name": "food item name",
-      "quantity": 1.5
-    }
+    { "name": "string", "quantity": number, "confidence": number }
   ]
 }
 """
@@ -83,45 +102,18 @@ def parse_quantity(qty_val) -> float:
     if "double" in qty_str:
         return 2.0
     
-    # Find first digits or decimal
     match = re.search(r'[-+]?\d*\.\d+|\d+', qty_str)
     if match:
         return float(match.group(0))
     return 1.0
 
 def get_single_serving_calories(food_name: str) -> int:
-    name_lower = food_name.lower().strip()
+    normalized_name = normalize(food_name)
     
-    # 1. Direct match in local map
-    for key, kcal in CALORIE_MAP.items():
-        if key == name_lower or (len(key) > 3 and key in name_lower):
-            return kcal
-            
-    # 2. Check dynamic cache
-    if name_lower in DYNAMIC_CALORIE_CACHE:
-        return DYNAMIC_CALORIE_CACHE[name_lower]
+    if normalized_name in CALORIE_MAP:
+        return CALORIE_MAP[normalized_name]
         
-    # 3. Query LLM for standard single serving estimation (cached for consistency)
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a calorie estimator. Return ONLY a single integer representing the calories in 1 standard serving of the food item. No other text."},
-                {"role": "user", "content": f"Estimate calories for 1 standard serving of: {food_name}"}
-            ],
-            model="llama3-8b-8192",
-            temperature=0.1
-        )
-        raw = chat_completion.choices[0].message.content.strip()
-        match = re.search(r'\d+', raw)
-        if match:
-            kcal = int(match.group(0))
-            DYNAMIC_CALORIE_CACHE[name_lower] = kcal
-            return kcal
-    except Exception:
-        pass
-        
-    # 4. Fallback
-    return 150
+    return 0 # Strict deterministic lookup - no guessing or fake fallbacks
 
 def calculate_calories(items_list):
     processed_items = []
@@ -150,90 +142,121 @@ def generate_health_suggestion(items_list) -> str:
                 {"role": "system", "content": "You are a supportive nutrition coach. Give a short, one-sentence healthy suggestion based on this meal. Keep it to 15 words or less."},
                 {"role": "user", "content": f"Meal items: {items_list}"}
             ],
-            model="llama3-8b-8192",
+            model="llama-3.3-70b-versatile",
             temperature=0.5
         )
         return chat_completion.choices[0].message.content.strip()
     except Exception:
         return "Good start! Pair your meal with plenty of water and daily exercise."
 
+def validate_items(items_list: List[FoodItem]) -> List[dict]:
+    clean = []
+    for item in items_list:
+        name = item.name.lower().strip()
+        qty = item.quantity
+        
+        if not name or not isinstance(qty, (int, float)):
+            continue
+        if qty <= 0 or qty > 20:
+            continue
+        if item.confidence < 0.6:
+            continue
+            
+        clean.append({
+            "name": name,
+            "quantity": qty
+        })
+    return clean
+
+def parse_and_validate_response(raw_response: str) -> List[dict]:
+    cleaned = clean_json_string(raw_response)
+    parsed_dict = json.loads(cleaned)
+    response_model = FoodResponse(**parsed_dict)
+    return validate_items(response_model.items)
+
 def analyze_food_text_ai(food_description: str):
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": SYSTEM_INSTRUCTION},
-                {"role": "user", "content": f"Analyze this food: {food_description}"},
-            ],
-            model="llama3-8b-8192",
-            temperature=0.2,
-            response_format={"type": "json_object"}
-        )
-        raw_response = chat_completion.choices[0].message.content
-        cleaned = clean_json_string(raw_response)
-        parsed = json.loads(cleaned)
-        
-        items = parsed.get("items", [])
-        processed_items, total_cals = calculate_calories(items)
-        suggestion = generate_health_suggestion(processed_items)
-        
-        return {
-            "items": processed_items,
-            "total_calories": total_cals,
-            "suggestion": suggestion
-        }
-    except Exception as e:
-        return get_fallback_nutrition(food_description)
+    for attempt in range(2):
+        try:
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": SYSTEM_INSTRUCTION},
+                    {"role": "user", "content": f"Analyze this food: {food_description}"},
+                ],
+                model="llama-3.3-70b-versatile",
+                temperature=0,
+                response_format={"type": "json_object"}
+            )
+            raw_response = chat_completion.choices[0].message.content
+            print("AI RAW (text):", raw_response)
+            
+            items = parse_and_validate_response(raw_response)
+            print("AFTER VALIDATION (text):", items)
+            
+            processed_items, total_cals = calculate_calories(items)
+            print("FINAL CALC (text):", processed_items, "Total:", total_cals)
+            
+            suggestion = generate_health_suggestion(processed_items)
+            
+            return {
+                "items": processed_items,
+                "total_calories": total_cals,
+                "suggestion": suggestion
+            }
+        except Exception as e:
+            print(f"Text analysis failed on attempt {attempt+1}: {e}")
+            if attempt == 1:
+                return get_fallback_nutrition(food_description)
 
 def analyze_food_image_ai(base64_image: str):
     if "," in base64_image:
         base64_image = base64_image.split(",")[1]
 
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": SYSTEM_INSTRUCTION},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Identify the food items and standard quantity in this image."},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
+    for attempt in range(2):
+        try:
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": SYSTEM_INSTRUCTION},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Extract all food items, standard portion quantity, and your confidence score from this image."},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
                             }
-                        }
-                    ]
-                }
-            ],
-            model="llama-3.2-11b-vision-preview",
-            temperature=0.2,
-            response_format={"type": "json_object"}
-        )
-        raw_response = chat_completion.choices[0].message.content
-        cleaned = clean_json_string(raw_response)
-        parsed = json.loads(cleaned)
-        
-        items = parsed.get("items", [])
-        processed_items, total_cals = calculate_calories(items)
-        suggestion = generate_health_suggestion(processed_items)
-        
-        return {
-            "items": processed_items,
-            "total_calories": total_cals,
-            "suggestion": suggestion
-        }
-    except Exception as e:
-        return get_fallback_nutrition("scanned food")
+                        ]
+                    }
+                ],
+                model="llama-3.2-11b-vision-preview",
+                temperature=0,
+                response_format={"type": "json_object"}
+            )
+            raw_response = chat_completion.choices[0].message.content
+            print("AI RAW (image):", raw_response)
+            
+            items = parse_and_validate_response(raw_response)
+            print("AFTER VALIDATION (image):", items)
+            
+            processed_items, total_cals = calculate_calories(items)
+            print("FINAL CALC (image):", processed_items, "Total:", total_cals)
+            
+            suggestion = generate_health_suggestion(processed_items)
+            
+            return {
+                "items": processed_items,
+                "total_calories": total_cals,
+                "suggestion": suggestion
+            }
+        except Exception as e:
+            print(f"Image analysis failed on attempt {attempt+1}: {e}")
+            if attempt == 1:
+                return get_fallback_nutrition("scanned food")
 
 def get_fallback_nutrition(description: str):
     return {
-        "items": [
-            {
-                "name": description,
-                "quantity": "1 serving",
-                "calories": 350
-            }
-        ],
-        "total_calories": 350,
-        "suggestion": "Connection error: showing safe default calorie estimate. Try a fresh meal!"
+        "items": [],
+        "total_calories": 0,
+        "suggestion": "Estimation unavailable for this meal. Please verify the food item spelling."
     }
