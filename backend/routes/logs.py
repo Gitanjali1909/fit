@@ -105,6 +105,18 @@ async def log_activity(req: ActivityCreate, db: Session = Depends(get_db)):
     }
 
 
+@router.delete("/log/{id}")
+async def delete_food_log(id: int, db: Session = Depends(get_db)):
+    food_log = db.query(FoodLog).filter(FoodLog.id == id).first()
+    if not food_log:
+        raise HTTPException(status_code=404, detail="Food log not found")
+    
+    db.delete(food_log)
+    db.commit()
+    return {"status": "success", "message": "Food log deleted successfully"}
+
+
+
 @router.get("/dashboard/{user_id}")
 async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     today = date.today()

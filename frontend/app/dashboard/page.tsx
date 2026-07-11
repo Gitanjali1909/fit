@@ -7,6 +7,7 @@ import {
   logFoodApi, 
   logActivityApi, 
   resetTodayApi,
+  deleteFoodLogApi,
   DashboardData 
 } from "@/lib/dashboardApi";
 import { getOrCreateUserId } from "@/lib/user";
@@ -16,10 +17,48 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<boolean>(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<number[]>([]);
 
   // Quick Log tabs
   const [activeLogTab, setActiveLogTab] = useState<"workout" | "food" | "activity" | null>(null);
   const [logStatus, setLogStatus] = useState<string | null>(null);
+
+  const handleDeleteFoodLog = async (logId: number, calories: number) => {
+    if (deletingIds.includes(logId)) return;
+    setDeletingIds((prev) => [...prev, logId]);
+
+    const previousData = data ? { ...data } : null;
+
+    // Optimistic Update
+    if (data) {
+      setData({
+        ...data,
+        today_calories_in: Math.max(0, data.today_calories_in - calories),
+        calories_in: Math.max(0, data.calories_in - calories),
+        food: data.food.filter((f) => f.id !== logId),
+      });
+    }
+
+    try {
+      setLogStatus("Removing item...");
+      await deleteFoodLogApi(logId);
+      setLogStatus("Food item removed!");
+      setTimeout(() => setLogStatus(null), 2000);
+      
+      // Fetch fresh data from backend to ensure score calculation is synced
+      const userId = getOrCreateUserId();
+      const res = await fetchDashboardData(userId); 
+      setData(res);
+    } catch (err) {
+      setLogStatus("Error removing item");
+      setTimeout(() => setLogStatus(null), 2000);
+      if (previousData) {
+        setData(previousData);
+      }
+    } finally {
+      setDeletingIds((prev) => prev.filter((id) => id !== logId));
+    }
+  };
 
   // Workout form states
   const [workoutType, setWorkoutType] = useState("");
@@ -350,9 +389,21 @@ export default function DashboardPage() {
               ))}
               
               {data.food && data.food.map((f) => (
-                <div key={`f-${f.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs">
+                <div key={`f-${f.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs group transition-all">
                   <span className="font-semibold text-white">🍱 {f.food_name}</span>
-                  <span className="text-emerald-400 font-mono font-bold">+{f.calories} kcal</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-emerald-400 font-mono font-bold">+{f.calories} kcal</span>
+                    <button
+                      onClick={() => handleDeleteFoodLog(f.id, f.calories)}
+                      disabled={deletingIds.includes(f.id)}
+                      className="text-red-400/50 hover:text-red-400 hover:scale-105 active:scale-95 transition-all p-1 cursor-pointer select-none disabled:opacity-30"
+                      title="Remove food log"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               ))}
               

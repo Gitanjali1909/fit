@@ -156,3 +156,14 @@ export const resetTodayApi = async (userId: string) => {
   });
   return res.json();
 };
+
+export const deleteFoodLogApi = async (logId: number) => {
+  const res = await fetch(`${API}/log/${logId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return res.json();
+};
+
