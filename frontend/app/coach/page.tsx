@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { sendMessage } from "@/lib/api";
-import { savePlanApi, fetchPlanApi } from "@/lib/dashboardApi";
+import { savePlanApi, fetchPlanApi, fetchDashboardData } from "@/lib/dashboardApi";
 import { getOrCreateUserId } from "@/lib/user";
 
 interface Message {
@@ -10,12 +10,6 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   mode: "coach" | "roast";
-  isPlan?: boolean;
-  planData?: {
-    goal: string;
-    workout: string[];
-    diet: string[];
-  };
 }
 
 interface UserProfile {
@@ -60,7 +54,6 @@ export default function CoachPage() {
     fetchPlanApi(userId)
       .then((data) => {
         if (data && data.plan_content && !data.plan_content.startsWith("No active plan")) {
-          const planData = parsePlanResponse(data.plan_content);
           setMessages((prev) => [
             ...prev,
             {
@@ -68,8 +61,6 @@ export default function CoachPage() {
               role: "assistant",
               content: data.plan_content,
               mode: "coach",
-              isPlan: true,
-              planData: planData || undefined,
             },
           ]);
         }
@@ -96,38 +87,6 @@ export default function CoachPage() {
     iconText: mode === "coach" ? "text-emerald-400" : "text-red-450",
   };
 
-  const parsePlanResponse = (text: string) => {
-    const goalMatch = text.match(/(?:Goal|Goal:)\s*([^\n]+)/i);
-    const workoutSection = text.match(/(?:Workout Plan|Workout|Workouts):([\s\S]*?)(?:Diet Plan|Diet|Nutrition:|$)/i);
-    const dietSection = text.match(/(?:Diet Plan|Diet|Nutrition):([\s\S]*?)(?:Workout Plan|Workout|Workouts:|$)/i) || 
-                        text.match(/(?:Diet Plan|Diet|Nutrition):([\s\S]*?)$/i);
-
-    if (!workoutSection && !dietSection && !goalMatch) {
-      if (text.toLowerCase().includes("plan") && (text.includes("1.") || text.includes("-"))) {
-        return {
-          goal: profile.goal || "Custom Fitness Goal",
-          workout: ["Custom exercises suggested - see chat text below"],
-          diet: ["Nutrition advice suggested - see chat text below"],
-        };
-      }
-      return null;
-    }
-
-    const parseList = (sectionText: string | undefined) => {
-      if (!sectionText) return [];
-      return sectionText
-        .split("\n")
-        .map((line) => line.replace(/^[\s*-•\d.)]+/, "").trim())
-        .filter((line) => line.length > 0);
-    };
-
-    return {
-      goal: goalMatch ? goalMatch[1].trim() : profile.goal,
-      workout: workoutSection ? parseList(workoutSection[1]) : [],
-      diet: dietSection ? parseList(dietSection[1]) : [],
-    };
-  };
-
   const handleSend = async (textToSend: string) => {
     const cleanedText = textToSend.trim();
     if (!cleanedText || loading) return;
@@ -139,29 +98,54 @@ export default function CoachPage() {
       content: cleanedText,
       mode: mode,
     };
+    
+    const historyPayload = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     setMessages((prev) => [...prev, newUserMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      const data = await sendMessage(cleanedText, profile, mode);
-      const replyText = data.reply || "No response received. Try again.";
+      const userId = getOrCreateUserId();
+      
+      let workoutsVal = "0";
+      let caloriesVal = "0";
+      let stepsVal = "0";
+      try {
+        const stats = await fetchDashboardData(userId);
+        workoutsVal = String(stats.workouts_done || 0);
+        caloriesVal = String(stats.today_calories_in || 0);
+        stepsVal = String(stats.steps || 0);
+      } catch (err) {}
 
-      const planData = parsePlanResponse(replyText);
-      const isPlan = planData !== null;
+      const activityPayload = {
+        workouts: workoutsVal,
+        calories: caloriesVal,
+        steps: stepsVal,
+      };
 
-      if (isPlan) {
-        const userId = getOrCreateUserId();
-        savePlanApi(userId, replyText).catch(() => {});
+      const data = await sendMessage(cleanedText, profile, mode, historyPayload, activityPayload);
+      const replyObj = data.reply || {};
+      const replyText = replyObj.response || "No response received. Try again.";
+      const replyTone = replyObj.tone || mode;
+
+      if (replyTone === "roast" || replyTone === "coach") {
+        setMode(replyTone);
+      }
+
+      if (replyObj.action && replyObj.action.type === "update_plan") {
+        const planText = replyObj.action.data?.plan_summary || replyText;
+        savePlanApi(userId, planText).catch(() => {});
       }
 
       const newAiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: replyText,
-        mode: mode,
-        isPlan,
-        planData: planData || undefined,
+        mode: replyTone,
       };
 
       setMessages((prev) => [...prev, newAiMsg]);
@@ -543,63 +527,15 @@ export default function CoachPage() {
 
                 {/* Msg Container */}
                 <div className="space-y-2">
-                  <div className={`px-4 py-2.5 rounded-2xl shadow-sm text-xs leading-relaxed ${
+                  <div className={`px-4 py-2.5 rounded-2xl shadow-sm text-xs leading-relaxed whitespace-pre-wrap ${
                     isUser 
                       ? "bg-white/5 text-white border border-white/10 rounded-tr-none" 
                       : `bg-white/5 text-gray-250 border border-white/10 rounded-tl-none`
                   }`}>
-                    {msg.content}
+                    {msg.content.split("\n").map((line, i) => (
+                      <p key={i} className="mb-1">{line}</p>
+                    ))}
                   </div>
-
-                  {/* Render parsed fitness plans */}
-                  {msg.isPlan && msg.planData && (
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-none space-y-4 animate-slideUp w-full max-w-lg">
-                      <div className="border-b border-white/10 pb-2">
-                        <span className="text-[8px] text-gray-500 uppercase tracking-widest font-black">Generated Target Plan</span>
-                        <h3 className="text-xs font-extrabold text-white mt-0.5 capitalize">
-                          🎯 Goal: {msg.planData.goal}
-                        </h3>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
-                          <h4 className={`text-[10px] font-black ${theme.text} uppercase tracking-widest mb-3 flex items-center gap-2`}>
-                            🏋️ Exercise Routine
-                          </h4>
-                          {msg.planData.workout.length > 0 ? (
-                            <ul className="space-y-2">
-                              {msg.planData.workout.map((item, idx) => (
-                                <li key={idx} className="text-xs text-gray-300 flex items-start gap-2.5">
-                                  <span className={`text-sm ${theme.text} leading-none mt-0.5`}>•</span>
-                                  <span className="font-medium leading-relaxed">{item}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-xs text-gray-500">No workout detail found.</p>
-                          )}
-                        </div>
-
-                        <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
-                          <h4 className={`text-[10px] font-black ${theme.text} uppercase tracking-widest mb-3 flex items-center gap-2`}>
-                            🍱 Nutrition Protocol
-                          </h4>
-                          {msg.planData.diet.length > 0 ? (
-                            <ul className="space-y-2">
-                              {msg.planData.diet.map((item, idx) => (
-                                <li key={idx} className="text-xs text-gray-300 flex items-start gap-2.5">
-                                  <span className={`text-sm ${theme.text} leading-none mt-0.5`}>•</span>
-                                  <span className="font-medium leading-relaxed">{item}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-xs text-gray-500">No nutritional details found.</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
               </div>

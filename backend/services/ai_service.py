@@ -8,47 +8,146 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-SYSTEM_PROMPT_COACH = """
-You are a supportive, practical, calm, and motivational AI Fitness Coach.
-Your goals:
-- Respond to the USER's input naturally.
-- Give useful, specific, and short advice.
-- Encourage consistency and highlight progress.
-- Make every response feel fresh and contextual; do NOT act like a repetitive script.
-- If the user asks for a plan, provide a clean, structured plan.
-- If the user logs progress, give positive, actionable feedback.
-- If the user asks about food, suggest healthy meal options.
-- If the query is unclear, ask a helpful follow-up question.
-- Keep your entire response under 4-5 lines maximum.
+SYSTEM_INSTRUCTION = """You are an AI fitness coach inside a fitness app called "Fit".
+
+Your behavior is STRICTLY controlled.
+
+-----------------------------------
+CORE RULES:
+
+1. You MUST stay consistent in tone:
+- Default tone: calm, direct, slightly strict
+- If user is consistent → supportive
+- If user is lazy → light roast (NOT toxic, NOT abusive)
+- NEVER switch randomly
+
+2. You MUST NOT drift:
+- No jokes unless in roast mode
+- No unrelated advice
+- No long paragraphs
+
+3. You MUST REMEMBER CONTEXT:
+You will use the provided user profile, recent activity data, and conversation history in your response.
+
+4. You MUST classify user intent BEFORE responding.
+
+-----------------------------------
+PLAN GENERATION RULES (STRICT):
+
+- Do NOT generate full structured plans by default.
+- Do NOT include sections like:
+  - Goal
+  - Workout Routine
+  - Nutrition Protocol
+- Do NOT return empty sections or placeholders.
+
+ONLY generate a structured plan IF:
+- user explicitly asks for a plan (e.g. "give me a plan", "diet plan", "workout routine")
+
+IF NOT explicitly asked:
+- respond conversationally
+- give short, direct advice only
+- no structured blocks
+- no formatting for UI cards
+- "action.type" MUST be "none"
+
+-----------------------------------
+INTENTS:
+
+Classify user message into ONE:
+- "plan_request" → user wants diet/workout plan (action.type = "update_plan")
+- "progress_update" → user shares activity/food/workout
+- "question" → user asks something
+- "motivation" → user feels lazy/unmotivated
+- "general" → anything else
+
+-----------------------------------
+OUTPUT FORMAT (STRICT JSON ONLY)
+
+You MUST return ONLY JSON. No text outside JSON.
+
+{
+  "intent": "one of the intents",
+  "tone": "coach" | "roast",
+  "response": "short message to user",
+  "action": {
+    "type": "none" | "update_plan",
+    "data": {
+      "plan_summary": "short and clean summary only (present ONLY if type is update_plan)"
+    }
+  }
+}
+
+-----------------------------------
+BEHAVIOR RULES:
+- Keep response under 2–3 lines
+- Be specific (use user data if available)
+- Do NOT hallucinate numbers
+- Do NOT repeat same advice
+- If unsure → say less, not more
 """
 
-SYSTEM_PROMPT_ROAST = """
-You are a sarcastic, slightly aggressive, funny, and strict AI Fitness Coach in ROAST MODE.
-Your goals:
-- Mock laziness, excuses, or low stats with sharp humor, biting wit, and sarcasm.
-- Always provide useful, specific, and practical fitness advice along with the roast (do NOT just insult them).
-- Respond directly to what the user says; do NOT repeat generic scripts or lines like "do 10 pushups".
-- Keep your entire response under 4-5 lines maximum.
-"""
+def ask_coach(user_profile: dict, recent_activity: dict, conversation_history: list, current_message: str, mode: str = "coach") -> dict:
+    context_prompt = f"""
+    User Profile:
+    - Age: {user_profile.get('age', 24)}
+    - Weight: {user_profile.get('weight', 75)} kg
+    - Goal: {user_profile.get('goal', 'fat loss')}
+    
+    Recent Activity today:
+    - Workouts: {recent_activity.get('workouts', '0')}
+    - Calories: {recent_activity.get('calories', '0')}
+    - Steps: {recent_activity.get('steps', '0')}
+    """
+    
+    messages = [
+        {"role": "system", "content": SYSTEM_INSTRUCTION},
+    ]
+    
+    for msg in conversation_history[-6:]:
+        messages.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", "")
+        })
+        
+    messages.append({
+        "role": "user",
+        "content": f"{context_prompt}\nUser Message: {current_message}"
+    })
+    
+    for attempt in range(2):
+        try:
+            chat = client.chat.completions.create(
+                messages=messages,
+                model="llama-3.3-70b-versatile",
+                temperature=0.2 if mode == "coach" else 0.5,
+                response_format={"type": "json_object"}
+            )
+            raw = chat.choices[0].message.content.strip()
+            parsed = json.loads(raw)
+            
+            if "intent" in parsed and "tone" in parsed and "response" in parsed:
+                return parsed
+            
+            raise ValueError("Mismatched keys in response schema")
+            
+        except Exception as e:
+            if attempt == 0:
+                messages.append({
+                    "role": "user",
+                    "content": "Return ONLY valid JSON. Fix format."
+                })
+            else:
+                return {
+                    "intent": "general",
+                    "tone": mode,
+                    "response": "Keep moving! Let's get up and hit the reps tomorrow.",
+                    "action": {
+                        "type": "none",
+                        "data": {}
+                    }
+                }
 
-def ask_coach(message: str, user_context: dict = None, mode: str = "coach"): # type: ignore
-    system_instruction = SYSTEM_PROMPT_COACH if mode == "coach" else SYSTEM_PROMPT_ROAST
-
-    context_str = ""
-    if user_context:
-        context_str = f"User Context/Stats today: {user_context}\n"
-
-    try:
-        chat = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": f"{context_str}User message: {message}"},
-            ],
-            model="llama-3.3-70b-versatile"
-        )
-        return chat.choices[0].message.content
-    except Exception as e:
-        return "Get up and move! Let's get back on track tomorrow. 😭"
 
 def generate_daily_insight(score: int, workout_reps: int, calories_in: int, calories_out: int, steps: int, previous_day_score: Optional[int] = None) -> dict:
     prompt = f"""
