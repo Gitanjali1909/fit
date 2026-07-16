@@ -35,6 +35,12 @@ export interface DashboardData {
   calories_in: number;
   calories_out: number;
   has_data?: boolean;
+  score_explanation?: string;
+  score_breakdown?: {
+    workout: number;
+    diet: number;
+    steps: number;
+  };
   workouts: WorkoutLogItem[];
   food: FoodLogItem[];
   activity: ActivityLogItem[];
@@ -157,13 +163,17 @@ export const resetTodayApi = async (userId: string) => {
   return res.json();
 };
 
-export const deleteFoodLogApi = async (logId: number) => {
-  const res = await fetch(`${API}/log/${logId}`, {
+export const deleteLogApi = async (logType: string, logId: number) => {
+  const res = await fetch(`${API}/log/${logType}/${logId}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
     },
   });
   return res.json();
+};
+
+export const deleteFoodLogApi = async (logId: number) => {
+  return deleteLogApi("food", logId);
 };
 

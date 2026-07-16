@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from db.session import get_db
 from db.models import Workout, FoodLog, ActivityLog, User, ScoreLog
 from services.score_service import calculate_score
-from services.ai_service import generate_daily_insight, generate_adaptive_insight
+from services.ai_service import generate_daily_insight, generate_adaptive_insight, generate_score_explanation
 from services.adaptive_service import analyze_user, adjust_plan
 from services.db_service import ensure_user_exists
 
@@ -86,11 +86,17 @@ async def log_activity(req: ActivityCreate, db: Session = Depends(get_db)):
     if calories is None or calories == 0:
         calories = int(met * user_weight * duration_hours)
 
+    steps = req.steps
+    if (steps is None or steps == 0) and req.activity_type.lower().strip() in ["walk", "run", "walking", "running"]:
+        steps = int(round((req.duration * 110) / 100.0) * 100)
+        if steps == 0 and req.duration > 0:
+            steps = 100
+
     activity = ActivityLog(
         user_id=req.user_id,
         activity_type=req.activity_type,
         duration=req.duration,
-        steps=req.steps,
+        steps=steps,
         calories_burned=calories,
         date=date.today()
     )
@@ -105,15 +111,55 @@ async def log_activity(req: ActivityCreate, db: Session = Depends(get_db)):
     }
 
 
+@router.delete("/log/{log_type}/{id}")
+async def delete_log(log_type: str, id: int, db: Session = Depends(get_db)):
+    today = date.today()
+    log_type_clean = log_type.lower().strip()
+    
+    if log_type_clean == "workout":
+        log = db.query(Workout).filter(Workout.id == id).first()
+    elif log_type_clean == "food":
+        log = db.query(FoodLog).filter(FoodLog.id == id).first()
+    elif log_type_clean == "activity":
+        log = db.query(ActivityLog).filter(ActivityLog.id == id).first()
+    else:
+        raise HTTPException(status_code=400, detail="Invalid log type")
+        
+    if not log:
+        raise HTTPException(status_code=404, detail="Log entry not found")
+        
+    user_id = log.user_id
+    db.delete(log)
+    db.commit()
+    
+    updated_logs = []
+    if log_type_clean == "workout":
+        items = db.query(Workout).filter(Workout.user_id == user_id, Workout.date == today).order_by(Workout.id.desc()).all()
+        updated_logs = [{"id": item.id, "type": item.type, "reps": item.reps} for item in items]
+    elif log_type_clean == "food":
+        items = db.query(FoodLog).filter(FoodLog.user_id == user_id, FoodLog.date == today).order_by(FoodLog.id.desc()).all()
+        updated_logs = [{"id": item.id, "food_name": item.food_name, "calories": item.calories} for item in items]
+    elif log_type_clean == "activity":
+        items = db.query(ActivityLog).filter(ActivityLog.user_id == user_id, ActivityLog.date == today).order_by(ActivityLog.id.desc()).all()
+        updated_logs = [{
+            "id": item.id,
+            "activity_type": item.activity_type,
+            "duration": item.duration,
+            "steps": item.steps,
+            "calories_burned": item.calories_burned
+        } for item in items]
+        
+    return {
+        "success": True,
+        "message": f"{log_type} log deleted successfully",
+        "updated_logs": updated_logs
+    }
+
+
 @router.delete("/log/{id}")
 async def delete_food_log(id: int, db: Session = Depends(get_db)):
-    food_log = db.query(FoodLog).filter(FoodLog.id == id).first()
-    if not food_log:
-        raise HTTPException(status_code=404, detail="Food log not found")
-    
-    db.delete(food_log)
-    db.commit()
-    return {"status": "success", "message": "Food log deleted successfully"}
+    return await delete_log("food", id, db)
+
 
 
 
@@ -174,18 +220,26 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
             "activity": []
         }
 
-    # 3. Fetch today's detailed lists
-    workouts_list = db.query(Workout).filter(Workout.user_id == user_id, Workout.date == today).all()
-    food_list = db.query(FoodLog).filter(FoodLog.user_id == user_id, FoodLog.date == today).all()
-    activity_list = db.query(ActivityLog).filter(ActivityLog.user_id == user_id, ActivityLog.date == today).all()
+    # 3. Fetch today's detailed lists (ordered latest first)
+    workouts_list = db.query(Workout).filter(Workout.user_id == user_id, Workout.date == today).order_by(Workout.id.desc()).all()
+    food_list = db.query(FoodLog).filter(FoodLog.user_id == user_id, FoodLog.date == today).order_by(FoodLog.id.desc()).all()
+    activity_list = db.query(ActivityLog).filter(ActivityLog.user_id == user_id, ActivityLog.date == today).order_by(ActivityLog.id.desc()).all()
 
-    # 4. Calculate Score using the formula:
-    # score = (calories_burned / goal_burn) * 40 + (workout_done ? 30 : 0) + (activity_logged ? 30 : 0)
-    goal_burn = 500.0  # target daily calorie burn threshold
-    burn_points = min((calories_burned / goal_burn) * 40.0, 40.0)
-    workout_points = 30.0 if workouts_done > 0 else 0.0
-    activity_points = 30.0 if (calories_burned > 0 or total_steps > 0) else 0.0
-    daily_score = int(burn_points + workout_points + activity_points)
+    # 4. Core Score Calculation
+    # Workout (40 pts max, target 50 reps)
+    workout_score = min(total_reps / 50.0, 1.0) * 40.0
+    
+    # Diet (40 pts max, target <= 2000 kcal)
+    if calories_in <= 2000.0:
+        diet_score = 40.0
+    else:
+        diff_penalty = (calories_in - 2000.0) / 25.0
+        diet_score = max(0.0, 40.0 - diff_penalty)
+        
+    # Steps (20 pts max, target 8000 steps)
+    steps_score = min(total_steps / 8000.0, 1.0) * 20.0
+    
+    daily_score = int(workout_score + diet_score + steps_score)
 
     # 5. Save calculated score to DB
     score_log = db.query(ScoreLog).filter(
@@ -208,8 +262,25 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     insights = analyze_user(adaptive_payload)
     plan_update = adjust_plan(insights)
 
-    # 7. Generate dynamic AI advice using Groq
-    ai_insight = generate_adaptive_insight(adaptive_payload)
+    # 7. Query yesterday's score for context
+    yesterday = today - timedelta(days=1)
+    yesterday_score_log = db.query(ScoreLog).filter(
+        ScoreLog.user_id == user_id,
+        ScoreLog.date == yesterday
+    ).first()
+    yesterday_score = yesterday_score_log.score if yesterday_score_log else None
+
+    # 8. Generate dynamic AI coach insight using strict JSON formatting
+    insight_payload = {
+        "score": daily_score,
+        "workout_reps": total_reps,
+        "calories_in": calories_in,
+        "calories_out": calories_burned,
+        "steps": total_steps,
+        "previous_day_score": yesterday_score
+    }
+    ai_insight = generate_adaptive_insight(insight_payload)
+    score_explanation = generate_score_explanation(workout_score, diet_score, steps_score)
 
     return {
         # Frontend-backward-compatible properties
@@ -229,6 +300,12 @@ async def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         "score": daily_score,
         "insight": ai_insight,
         "has_data": True,
+        "score_explanation": score_explanation,
+        "score_breakdown": {
+            "workout": int(workout_score),
+            "diet": int(diet_score),
+            "steps": int(steps_score)
+        },
         
         # Lists
         "workouts": [{"type": w.type, "reps": w.reps, "id": w.id} for w in workouts_list],

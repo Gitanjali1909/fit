@@ -8,6 +8,7 @@ import {
   logActivityApi, 
   resetTodayApi,
   deleteFoodLogApi,
+  deleteLogApi,
   DashboardData 
 } from "@/lib/dashboardApi";
 import { getOrCreateUserId } from "@/lib/user";
@@ -23,7 +24,31 @@ export default function DashboardPage() {
   const [activeLogTab, setActiveLogTab] = useState<"workout" | "food" | "activity" | null>(null);
   const [logStatus, setLogStatus] = useState<string | null>(null);
 
-  const handleDeleteFoodLog = async (logId: number, calories: number) => {
+  const formatWorkoutDisplay = (type: string, reps: number) => {
+    const clean = type.trim().toLowerCase();
+    let display = type;
+    
+    if (clean === "pushup" || clean === "pushups" || clean === "push-up" || clean === "push-ups") {
+      display = "Pushups";
+    } else if (clean === "squat" || clean === "squats") {
+      display = "Squats";
+    } else if (clean === "pullup" || clean === "pullups" || clean === "pull-up" || clean === "pull-ups") {
+      display = "Pullups";
+    } else if (clean === "lunge" || clean === "lunges") {
+      display = "Lunges";
+    } else if (clean === "situp" || clean === "situps" || clean === "sit-up" || clean === "sit-ups") {
+      display = "Situps";
+    } else if (clean === "plank" || clean === "planks") {
+      display = "Planks";
+    } else {
+      const capitalized = type.charAt(0).toUpperCase() + type.slice(1);
+      display = capitalized.endsWith("s") ? capitalized : capitalized + "s";
+    }
+    
+    return `${display} – ${reps} reps`;
+  };
+
+  const handleDeleteLog = async (logType: "workout" | "food" | "activity", logId: number) => {
     if (deletingIds.includes(logId)) return;
     setDeletingIds((prev) => [...prev, logId]);
 
@@ -31,18 +56,35 @@ export default function DashboardPage() {
 
     // Optimistic Update
     if (data) {
-      setData({
-        ...data,
-        today_calories_in: Math.max(0, data.today_calories_in - calories),
-        calories_in: Math.max(0, data.calories_in - calories),
-        food: data.food.filter((f) => f.id !== logId),
-      });
+      const updated = { ...data };
+      if (logType === "food") {
+        const item = data.food.find((f) => f.id === logId);
+        const cals = item ? item.calories : 0;
+        updated.today_calories_in = Math.max(0, data.today_calories_in - cals);
+        updated.calories_in = Math.max(0, data.calories_in - cals);
+        updated.food = data.food.filter((f) => f.id !== logId);
+      } else if (logType === "workout") {
+        const item = data.workouts.find((w) => w.id === logId);
+        const reps = item ? item.reps : 0;
+        updated.workouts_done = Math.max(0, data.workouts_done - 1);
+        updated.reps = Math.max(0, data.reps - reps);
+        updated.workouts = data.workouts.filter((w) => w.id !== logId);
+      } else if (logType === "activity") {
+        const item = data.activity.find((a) => a.id === logId);
+        const cals_out = item ? item.calories_burned : 0;
+        const steps = item && item.steps ? item.steps : 0;
+        updated.today_calories_burned = Math.max(0, data.today_calories_burned - cals_out);
+        updated.calories_out = Math.max(0, data.calories_out - cals_out);
+        updated.steps = Math.max(0, data.steps - steps);
+        updated.activity = data.activity.filter((a) => a.id !== logId);
+      }
+      setData(updated);
     }
 
     try {
-      setLogStatus("Removing item...");
-      await deleteFoodLogApi(logId);
-      setLogStatus("Food item removed!");
+      setLogStatus(`Removing ${logType}...`);
+      await deleteLogApi(logType, logId);
+      setLogStatus("Item removed successfully!");
       setTimeout(() => setLogStatus(null), 2000);
       
       // Fetch fresh data from backend to ensure score calculation is synced
@@ -50,7 +92,7 @@ export default function DashboardPage() {
       const res = await fetchDashboardData(userId); 
       setData(res);
     } catch (err) {
-      setLogStatus("Error removing item");
+      setLogStatus("Error removing log");
       setTimeout(() => setLogStatus(null), 2000);
       if (previousData) {
         setData(previousData);
@@ -180,10 +222,11 @@ export default function DashboardPage() {
   const dailySteps = data ? data.steps : 0;
   const hasData = data && data.has_data;
 
-  // Score breakdown calculations
-  const workoutPoints = workoutsCount > 0 ? 30 : 0;
-  const burnPoints = Math.round(Math.min((calsOut / 500) * 40, 40));
-  const loggingPoints = (calsOut > 0 || dailySteps > 0) ? 30 : 0;
+  // Score breakdown calculations read directly from backend
+  const workoutPoints = data?.score_breakdown?.workout ?? 0;
+  const dietPoints = data?.score_breakdown?.diet ?? 0;
+  const stepsPoints = data?.score_breakdown?.steps ?? 0;
+  const scoreExplanation = data?.score_explanation ?? "";
 
   return (
     <div className="flex flex-col gap-3 w-full max-w-3xl mx-auto px-4">
@@ -252,10 +295,8 @@ export default function DashboardPage() {
                   </span>
                   <span className="text-xs text-gray-500 font-bold">/100</span>
                 </div>
-                <p className="text-[10px] text-gray-400 max-w-[220px] leading-relaxed">
-                  {score >= 80 
-                    ? "Outstanding performance! You are on track to crush your fitness goals."
-                    : "Keep moving! Every step, rep, and healthy meal helps boost your score."}
+                <p className="text-[10px] text-gray-400 max-w-[240px] leading-relaxed font-medium">
+                  {scoreExplanation || "Start recording today to build up your fitness score."}
                 </p>
               </div>
 
@@ -295,15 +336,15 @@ export default function DashboardPage() {
                     <span className="font-mono text-white font-bold">+{workoutPoints} pts</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-white/5 pb-1.5">
-                    <span className="flex items-center gap-1.5">🏃 Calorie Burn (MET-based)</span>
-                    <span className="font-mono text-white font-bold">+{burnPoints} pts</span>
+                    <span className="flex items-center gap-1.5">🍱 Diet & Calories</span>
+                    <span className="font-mono text-white font-bold">+{dietPoints} pts</span>
                   </div>
                   <div className="flex justify-between items-center pb-0.5">
-                    <span className="flex items-center gap-1.5">📝 Log Consistency</span>
-                    <span className="font-mono text-white font-bold">+{loggingPoints} pts</span>
+                    <span className="flex items-center gap-1.5">🏃 Steps Volume</span>
+                    <span className="font-mono text-white font-bold">+{stepsPoints} pts</span>
                   </div>
-                  <p className="text-[9px] text-gray-500 pt-1 leading-normal italic">
-                    Breakdown rules: Workout logged = 30 pts; Activity/Steps logged = 30 pts; Calorie burn vs 500 kcal target = up to 40 pts.
+                  <p className="text-[9px] text-gray-550 pt-1 leading-normal italic">
+                    Breakdown rules: Workout = up to 40 pts (target 50 reps); Diet = up to 40 pts (target &le; 2000 kcal); Steps = up to 20 pts (target 8000 steps).
                   </p>
                 </div>
               )}
@@ -382,9 +423,18 @@ export default function DashboardPage() {
             
             <div className="flex flex-col gap-2">
               {data.workouts && data.workouts.map((w) => (
-                <div key={`w-${w.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs">
-                  <span className="font-semibold text-white">🏋️ {w.type}</span>
-                  <span className="text-gray-400 font-mono font-bold">{w.reps} reps</span>
+                <div key={`w-${w.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs group transition-all">
+                  <span className="font-semibold text-white">🏋️ {formatWorkoutDisplay(w.type, w.reps)}</span>
+                  <button
+                    onClick={() => handleDeleteLog("workout", w.id)}
+                    disabled={deletingIds.includes(w.id)}
+                    className="text-red-400/50 hover:text-red-400 hover:scale-105 active:scale-95 transition-all p-1 cursor-pointer select-none disabled:opacity-30"
+                    title="Remove workout log"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               ))}
               
@@ -394,7 +444,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2.5">
                     <span className="text-emerald-400 font-mono font-bold">+{f.calories} kcal</span>
                     <button
-                      onClick={() => handleDeleteFoodLog(f.id, f.calories)}
+                      onClick={() => handleDeleteLog("food", f.id)}
                       disabled={deletingIds.includes(f.id)}
                       className="text-red-400/50 hover:text-red-400 hover:scale-105 active:scale-95 transition-all p-1 cursor-pointer select-none disabled:opacity-30"
                       title="Remove food log"
@@ -408,16 +458,28 @@ export default function DashboardPage() {
               ))}
               
               {data.activity && data.activity.map((a) => (
-                <div key={`a-${a.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs">
+                <div key={`a-${a.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs group transition-all">
                   <div className="flex flex-col">
-                    <span className="font-semibold text-white">🏃 {a.activity_type}</span>
+                    <span className="font-semibold text-white">🏃 {a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1)}</span>
                     {a.steps && a.steps > 0 ? (
-                      <span className="text-[9px] text-gray-500 mt-0.5">{a.steps} steps</span>
+                      <span className="text-[9px] text-gray-500 mt-0.5">{a.steps.toLocaleString()} steps</span>
                     ) : null}
                   </div>
-                  <div className="text-right">
-                    <span className="text-red-405 font-mono font-bold">-{a.calories_burned} kcal</span>
-                    <span className="block text-[9px] text-gray-500 mt-0.5">{a.duration} min</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="text-right">
+                      <span className="text-red-400 font-mono font-bold">-{a.calories_burned} kcal</span>
+                      <span className="block text-[9px] text-gray-500 mt-0.5">{a.duration} min</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteLog("activity", a.id)}
+                      disabled={deletingIds.includes(a.id)}
+                      className="text-red-400/50 hover:text-red-400 hover:scale-105 active:scale-95 transition-all p-1 cursor-pointer select-none disabled:opacity-30"
+                      title="Remove activity log"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
