@@ -6,23 +6,55 @@ import { getOrCreateUserId } from "@/lib/user";
 
 interface FoodItem {
   name: string;
-  quantity: string;
   calories: number;
+  estimated: boolean;
 }
 
 interface FoodResult {
+  status: "success" | "not_food" | "unknown_food";
   items: FoodItem[];
   total_calories: number;
   suggestion: string;
   logged?: boolean;
 }
 
+const COMMON_FOODS = [
+  { id: "egg", label: "🥚 Egg", unit: "piece" },
+  { id: "roti", label: "🫓 Roti", unit: "piece" },
+  { id: "chapati", label: "🫓 Chapati", unit: "piece" },
+  { id: "rice", label: "🍚 Rice", unit: "bowl" },
+  { id: "dal", label: "🥣 Dal", unit: "bowl" },
+  { id: "paneer", label: "🧀 Paneer", unit: "gram" },
+  { id: "chicken", label: "🍗 Chicken", unit: "gram" },
+  { id: "milk", label: "🥛 Milk", unit: "cup" },
+  { id: "banana", label: "🍌 Banana", unit: "piece" },
+  { id: "apple", label: "🍎 Apple", unit: "piece" },
+  { id: "bread", label: "🍞 Bread", unit: "piece" },
+  { id: "butter", label: "🧈 Butter", unit: "gram" },
+  { id: "curd", label: "🥣 Curd", unit: "bowl" },
+  { id: "oats", label: "🥣 Oats", unit: "bowl" },
+  { id: "avocado", label: "🥑 Avocado", unit: "piece" },
+  { id: "salad", label: "🥗 Salad", unit: "bowl" },
+  { id: "protein shake", label: "🥤 Protein Shake", unit: "cup" },
+  { id: "fish", label: "🐟 Fish", unit: "gram" },
+  { id: "almonds", label: "🥜 Almonds", unit: "piece" },
+  { id: "egg whites", label: "🥚 Egg Whites", unit: "piece" },
+  { id: "coffee", label: "☕ Coffee", unit: "cup" },
+  { id: "tea", label: "🍵 Tea", unit: "cup" }
+];
+
 export default function FoodPage() {
-  const [tab, setTab] = useState<"scan" | "upload" | "manual">("scan");
+  const [tab, setTab] = useState<"manual" | "scan" | "upload">("manual");
   const [foodInput, setFoodInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<FoodResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Manual structured inputs
+  const [useCustomText, setUseCustomText] = useState(false);
+  const [manualFood, setManualFood] = useState("egg");
+  const [manualQty, setManualQty] = useState(1);
+  const [portionSize, setPortionSize] = useState<"small" | "medium" | "large">("medium");
 
   // Upload state
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -32,6 +64,8 @@ export default function FoodPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [streamActive, setStreamActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+
+  const selectedFoodConfig = COMMON_FOODS.find((f) => f.id === manualFood) || COMMON_FOODS[0];
 
   const startCamera = async () => {
     try {
@@ -70,7 +104,7 @@ export default function FoodPage() {
 
   const handleManualAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!foodInput.trim() || loading) return;
+    if (loading) return;
 
     setLoading(true);
     setError(null);
@@ -78,25 +112,39 @@ export default function FoodPage() {
 
     try {
       const userId = getOrCreateUserId();
+      let payload = {};
+
+      if (useCustomText) {
+        if (!foodInput.trim()) {
+          setLoading(false);
+          return;
+        }
+        payload = { food: foodInput.trim(), portion_size: portionSize, user_id: userId };
+      } else {
+        payload = { name: manualFood, quantity: Number(manualQty), portion_size: portionSize, user_id: userId };
+      }
+
       const res = await fetch(`${API}/food/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ food: foodInput.trim(), user_id: userId }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("Estimation failed");
 
       const data: FoodResult = await res.json();
-      setResult(data);
+      
+      if (data.status === "not_food") {
+        setError("No food detected. Please enter or describe food items.");
+      } else if (data.status === "unknown_food") {
+        setError("Food not recognized. We only estimate calories for standardized foods in our database.");
+      } else {
+        setResult(data);
+      }
     } catch (err) {
-      setError("AI estimation failed. Using offline backup estimate.");
-      setResult({
-        items: [{ name: foodInput.trim(), quantity: "1 serving", calories: 380 }],
-        total_calories: 380,
-        suggestion: "Estimated using offline fallbacks. Check your server connection.",
-      });
+      setError("AI estimation failed. Make sure your server is online and try again.");
     } finally {
       setLoading(false);
     }
@@ -163,20 +211,22 @@ export default function FoodPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ image: base64Data, user_id: userId }),
+        body: JSON.stringify({ image: base64Data, portion_size: portionSize, user_id: userId }),
       });
 
       if (!res.ok) throw new Error("Vision estimation failed");
 
       const data: FoodResult = await res.json();
-      setResult(data);
+      
+      if (data.status === "not_food") {
+        setError("No food detected. Please capture a clear photo of your meal.");
+      } else if (data.status === "unknown_food") {
+        setError("Food not recognized. We only estimate calories for standardized foods in our database.");
+      } else {
+        setResult(data);
+      }
     } catch (err) {
-      setError("Failed to analyze image. Showing offline scan fallback.");
-      setResult({
-        items: [{ name: "Scanned Food", quantity: "1 serving", calories: 420 }],
-        total_calories: 420,
-        suggestion: "AI fallback activated. Verify your server connection and try again.",
-      });
+      setError("Failed to analyze image. Ensure your server is online and try again.");
     } finally {
       setLoading(false);
     }
@@ -187,6 +237,7 @@ export default function FoodPage() {
     setError(null);
     setFoodInput("");
     setSelectedImage(null);
+    setManualQty(1);
     if (tab === "scan") {
       startCamera();
     }
@@ -208,12 +259,12 @@ export default function FoodPage() {
         </div>
       </div>
 
-      {/* THREE-WAY TOGGLER */}
+      {/* THREE-WAY TOGGLER (MANUAL FIRST) */}
       <div className="flex p-0.5 bg-white/5 border border-white/10 rounded-xl max-w-sm">
         {[
+          { id: "manual", label: "✍️ Manual" },
           { id: "scan", label: "📸 Scan" },
-          { id: "upload", label: "🖼️ Upload" },
-          { id: "manual", label: "✍️ Manual" }
+          { id: "upload", label: "🖼️ Upload" }
         ].map((item) => (
           <button
             key={item.id}
@@ -234,7 +285,34 @@ export default function FoodPage() {
         ))}
       </div>
 
-      {/* ERROR TOAST - Premium Glassmorphism */}
+      {/* PORTION SIZE SELECTOR */}
+      <div className="flex flex-col gap-1.5 max-w-sm">
+        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+          Portion Size
+        </label>
+        <div className="flex p-0.5 bg-white/5 border border-white/10 rounded-xl">
+          {[
+            { id: "small", label: "🥗 Small (0.8x)" },
+            { id: "medium", label: "🍽️ Medium (1.0x)" },
+            { id: "large", label: "🍖 Large (1.3x)" }
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setPortionSize(item.id as any)}
+              className={`flex-1 py-1.5 text-center rounded-lg text-[10px] font-semibold transition-all active:scale-95 cursor-pointer ${
+                portionSize === item.id
+                  ? "bg-emerald-500 text-black shadow-sm"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ERROR TOAST */}
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl flex items-center justify-between text-xs text-red-400 backdrop-blur-md animate-slideUp">
           <div className="flex items-center gap-2">
@@ -250,7 +328,117 @@ export default function FoodPage() {
         </div>
       )}
 
-      {/* 1. CAMERA SCAN PANEL */}
+      {/* 1. MANUAL INPUT FORM (PRIMARY) */}
+      {tab === "manual" && !result && (
+        <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md shadow-none space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUseCustomText(false);
+                setError(null);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                !useCustomText 
+                  ? "bg-white/10 text-white border border-white/20" 
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Structured Log
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUseCustomText(true);
+                setError(null);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                useCustomText 
+                  ? "bg-white/10 text-white border border-white/20" 
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Natural Text
+            </button>
+          </div>
+
+          <form onSubmit={handleManualAnalyze} className="space-y-4">
+            {!useCustomText ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="food-select" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                    Select Food Item
+                  </label>
+                  <select
+                    id="food-select"
+                    value={manualFood}
+                    onChange={(e) => setManualFood(e.target.value)}
+                    className="w-full bg-neutral-900 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2.5 text-xs text-white outline-none transition-all"
+                    disabled={loading}
+                  >
+                    {COMMON_FOODS.map((food) => (
+                      <option key={food.id} value={food.id} className="bg-neutral-950 text-white">
+                        {food.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="qty-input" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                    Quantity ({selectedFoodConfig.unit}s)
+                  </label>
+                  <input
+                    id="qty-input"
+                    type="number"
+                    min="0.1"
+                    max="1000"
+                    step="0.1"
+                    value={manualQty}
+                    onChange={(e) => setManualQty(Number(e.target.value))}
+                    className="w-full bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2.5 text-xs text-white outline-none transition-all font-mono"
+                    disabled={loading}
+                    required
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="food-desc" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                  Describe what you ate
+                </label>
+                <input
+                  id="food-desc"
+                  type="text"
+                  value={foodInput}
+                  onChange={(e) => setFoodInput(e.target.value)}
+                  placeholder="e.g. 2 eggs and a bowl of dal"
+                  className="w-full bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-3 text-xs text-white outline-none transition-all placeholder:text-gray-650"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-white/5 disabled:text-gray-600 text-black font-semibold text-xs uppercase tracking-wider py-3 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-black animate-spin" />
+                  <span>Calculating...</span>
+                </>
+              ) : (
+                <span>Log Meal</span>
+              )}
+            </button>
+          </form>
+        </section>
+      )}
+
+      {/* 2. CAMERA SCAN PANEL */}
       {tab === "scan" && !result && (
         <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md space-y-4 relative overflow-hidden shadow-none flex flex-col items-center">
           {cameraError ? (
@@ -306,7 +494,7 @@ export default function FoodPage() {
         </section>
       )}
 
-      {/* 2. IMAGE UPLOAD PANEL */}
+      {/* 3. IMAGE UPLOAD PANEL */}
       {tab === "upload" && !result && (
         <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md space-y-4 shadow-none flex flex-col items-center">
           <div className="w-full relative min-h-[180px] rounded-xl border border-dashed border-white/15 bg-white/5 hover:bg-white/10 transition-all flex flex-col items-center justify-center p-5 text-center">
@@ -356,44 +544,6 @@ export default function FoodPage() {
         </section>
       )}
 
-      {/* 3. MANUAL INPUT FORM */}
-      {tab === "manual" && !result && (
-        <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md shadow-none">
-          <form onSubmit={handleManualAnalyze} className="space-y-4">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="food-input" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                What did you eat?
-              </label>
-              <input
-                id="food-input"
-                type="text"
-                value={foodInput}
-                onChange={(e) => setFoodInput(e.target.value)}
-                placeholder="e.g. 2 boiled eggs and 1 slice of whole wheat toast"
-                className="w-full bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-3 text-xs text-white outline-none transition-all placeholder:text-gray-650"
-                required
-                disabled={loading}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !foodInput.trim()}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-white/5 disabled:text-gray-600 text-black font-semibold text-xs uppercase tracking-wider py-3 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-black animate-bounce"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-black animate-bounce [animation-delay:0.2s]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-black animate-bounce [animation-delay:0.4s]"></span>
-                </>
-              ) : (
-                "Analyze Meal"
-              )}
-            </button>
-          </form>
-        </section>
-      )}
-
       {/* RESULTS DISPLAY PANEL */}
       {result && (
         <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md shadow-none animate-slideUp space-y-5">
@@ -412,8 +562,10 @@ export default function FoodPage() {
             {result.items && result.items.map((item, idx) => (
               <div key={idx} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs">
                 <div className="flex flex-col">
-                  <span className="font-semibold text-white">{item.name}</span>
-                  <span className="text-[9px] text-gray-500 mt-0.5">{item.quantity}</span>
+                  <span className="font-semibold text-white capitalize">{item.name}</span>
+                  <span className="text-[9px] text-gray-500 mt-0.5 font-medium">
+                    {item.estimated ? "⚠️ AI Estimated fallback" : "✅ DB standardized portion"}
+                  </span>
                 </div>
                 <span className="text-emerald-400 font-mono font-bold">{item.calories} kcal</span>
               </div>
@@ -449,7 +601,7 @@ export default function FoodPage() {
               Analyze Another Meal
             </button>
             <p className="text-[9px] text-gray-550 text-center italic">
-              * Calories are calculated using standard values.
+              * Calories are standardized estimates
             </p>
           </div>
         </section>
