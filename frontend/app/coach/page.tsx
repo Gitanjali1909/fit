@@ -230,10 +230,10 @@ export default function CoachPage() {
   };
 
   const goals = [
-    { id: "Muscle Gain", label: "Muscle Gain", desc: "Build mass", icon: "💪" },
-    { id: "Fat Loss", label: "Fat Loss", desc: "Shred fat", icon: "🔥" },
-    { id: "Endurance", label: "Endurance", desc: "Boost cardio", icon: "🏃" },
-    { id: "Maintenance", label: "Maintenance", desc: "Optimize health", icon: "⚖️" },
+    { id: "Muscle Gain", label: "Muscle Gain", desc: "Build mass", icon: "" },
+    { id: "Fat Loss", label: "Fat Loss", desc: "Shred fat", icon: "" },
+    { id: "Endurance", label: "Endurance", desc: "Boost cardio", icon: "" },
+    { id: "Maintenance", label: "Maintenance", desc: "Optimize health", icon: "" },
   ];
 
   return (
@@ -289,7 +289,7 @@ export default function CoachPage() {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              Roast 😈
+              Roast Mode
             </button>
           </div>
         </div>
@@ -302,7 +302,7 @@ export default function CoachPage() {
           : "bg-red-500/5 border-red-500/20 text-red-400"
       }`}>
         <span className="flex items-center gap-1.5">
-          <span>{mode === "coach" ? "🌿" : "😈"}</span>
+          <span>{mode === "coach" ? "[Coach]" : "[Roast]"}</span>
           <span>{mode === "coach" ? "Supportive AI Coach Mode Active" : "Savage AI Roast Mode Active (Brace yourself)"}</span>
         </span>
         <span className="text-[9px] uppercase tracking-wider font-bold opacity-60">Differentiated Response Engaged</span>
@@ -522,7 +522,7 @@ export default function CoachPage() {
                     ? "bg-white/10 text-white border border-white/15" 
                     : `${theme.iconBg} ${theme.iconText} border ${theme.bubbleBorder}`
                 }`}>
-                  {isUser ? "👤" : msg.mode === "roast" ? "😈" : "💪"}
+                  {isUser ? "[U]" : msg.mode === "roast" ? "[R]" : "[C]"}
                 </div>
 
                 {/* Msg Container */}
@@ -545,7 +545,7 @@ export default function CoachPage() {
           {loading && (
             <div className="flex gap-3 max-w-3xl mr-auto animate-fadeIn">
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-none ${theme.iconBg} ${theme.iconText}`}>
-                {mode === "roast" ? "😈" : "💪"}
+                {mode === "roast" ? "[R]" : "[C]"}
               </div>
               <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-4 py-2.5 rounded-2xl rounded-tl-none shadow-none">
                 <span className={`w-1.5 h-1.5 rounded-full ${theme.dots} animate-bounce`}></span>
@@ -562,17 +562,16 @@ export default function CoachPage() {
         <div className="border-t border-white/10 pt-4 space-y-3">
           <div className="flex flex-wrap gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             {[
-              { label: "Create my plan", icon: "📋" },
-              { label: "Today's workout", icon: "🏋️" },
-              { label: "What should I eat?", icon: "🍱" },
-              { label: "Analyze my progress", icon: "📊" }
+              { label: "Create my plan" },
+              { label: "Today's workout" },
+              { label: "What should I eat?" },
+              { label: "Analyze my progress" }
             ].map((action) => (
               <button
                 key={action.label}
                 onClick={() => triggerQuickAction(action.label)}
                 className={`px-3 py-1.5 bg-white/5 hover:bg-white/10 active:scale-95 text-[10px] font-bold text-gray-300 hover:text-white rounded-lg border border-white/10 shadow-none transition-all shrink-0 cursor-pointer flex items-center gap-1`}
               >
-                <span>{action.icon}</span>
                 <span>{action.label}</span>
               </button>
             ))}

@@ -19,28 +19,28 @@ interface FoodResult {
 }
 
 const COMMON_FOODS = [
-  { id: "egg", label: "🥚 Egg", unit: "piece" },
-  { id: "roti", label: "🫓 Roti", unit: "piece" },
-  { id: "chapati", label: "🫓 Chapati", unit: "piece" },
-  { id: "rice", label: "🍚 Rice", unit: "bowl" },
-  { id: "dal", label: "🥣 Dal", unit: "bowl" },
-  { id: "paneer", label: "🧀 Paneer", unit: "gram" },
-  { id: "chicken", label: "🍗 Chicken", unit: "gram" },
-  { id: "milk", label: "🥛 Milk", unit: "cup" },
-  { id: "banana", label: "🍌 Banana", unit: "piece" },
-  { id: "apple", label: "🍎 Apple", unit: "piece" },
-  { id: "bread", label: "🍞 Bread", unit: "piece" },
-  { id: "butter", label: "🧈 Butter", unit: "gram" },
-  { id: "curd", label: "🥣 Curd", unit: "bowl" },
-  { id: "oats", label: "🥣 Oats", unit: "bowl" },
-  { id: "avocado", label: "🥑 Avocado", unit: "piece" },
-  { id: "salad", label: "🥗 Salad", unit: "bowl" },
-  { id: "protein shake", label: "🥤 Protein Shake", unit: "cup" },
-  { id: "fish", label: "🐟 Fish", unit: "gram" },
-  { id: "almonds", label: "🥜 Almonds", unit: "piece" },
-  { id: "egg whites", label: "🥚 Egg Whites", unit: "piece" },
-  { id: "coffee", label: "☕ Coffee", unit: "cup" },
-  { id: "tea", label: "🍵 Tea", unit: "cup" }
+  { id: "egg", label: "Egg", unit: "piece" },
+  { id: "roti", label: "Roti", unit: "piece" },
+  { id: "chapati", label: "Chapati", unit: "piece" },
+  { id: "rice", label: "Rice", unit: "bowl" },
+  { id: "dal", label: "Dal", unit: "bowl" },
+  { id: "paneer", label: "Paneer", unit: "gram" },
+  { id: "chicken", label: "Chicken", unit: "gram" },
+  { id: "milk", label: "Milk", unit: "cup" },
+  { id: "banana", label: "Banana", unit: "piece" },
+  { id: "apple", label: "Apple", unit: "piece" },
+  { id: "bread", label: "Bread", unit: "piece" },
+  { id: "butter", label: "Butter", unit: "gram" },
+  { id: "curd", label: "Curd", unit: "bowl" },
+  { id: "oats", label: "Oats", unit: "bowl" },
+  { id: "avocado", label: "Avocado", unit: "piece" },
+  { id: "salad", label: "Salad", unit: "bowl" },
+  { id: "protein shake", label: "Protein Shake", unit: "cup" },
+  { id: "fish", label: "Fish", unit: "gram" },
+  { id: "almonds", label: "Almonds", unit: "piece" },
+  { id: "egg whites", label: "Egg Whites", unit: "piece" },
+  { id: "coffee", label: "Coffee", unit: "cup" },
+  { id: "tea", label: "Tea", unit: "cup" }
 ];
 
 export default function FoodPage() {
@@ -262,9 +262,9 @@ export default function FoodPage() {
       {/* THREE-WAY TOGGLER (MANUAL FIRST) */}
       <div className="flex p-0.5 bg-white/5 border border-white/10 rounded-xl max-w-sm">
         {[
-          { id: "manual", label: "✍️ Manual" },
-          { id: "scan", label: "📸 Scan" },
-          { id: "upload", label: "🖼️ Upload" }
+          { id: "manual", label: "Manual" },
+          { id: "scan", label: "Scan" },
+          { id: "upload", label: "Upload" }
         ].map((item) => (
           <button
             key={item.id}
@@ -292,9 +292,9 @@ export default function FoodPage() {
         </label>
         <div className="flex p-0.5 bg-white/5 border border-white/10 rounded-xl">
           {[
-            { id: "small", label: "🥗 Small (0.8x)" },
-            { id: "medium", label: "🍽️ Medium (1.0x)" },
-            { id: "large", label: "🍖 Large (1.3x)" }
+            { id: "small", label: "Small (0.8x)" },
+            { id: "medium", label: "Medium (1.0x)" },
+            { id: "large", label: "Large (1.3x)" }
           ].map((item) => (
             <button
               key={item.id}
@@ -316,7 +316,7 @@ export default function FoodPage() {
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl flex items-center justify-between text-xs text-red-400 backdrop-blur-md animate-slideUp">
           <div className="flex items-center gap-2">
-            <span>⚠️</span>
+            <span>[Error]</span>
             <span>{error}</span>
           </div>
           <button 
@@ -443,7 +443,7 @@ export default function FoodPage() {
         <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md space-y-4 relative overflow-hidden shadow-none flex flex-col items-center">
           {cameraError ? (
             <div className="text-center py-8 text-xs text-gray-400 space-y-2 max-w-xs">
-              <span className="text-2xl block">📷</span>
+              <span className="text-lg font-bold block">[Camera]</span>
               <p>{cameraError}</p>
               <button 
                 onClick={startCamera}
@@ -488,7 +488,7 @@ export default function FoodPage() {
                 <span>Analyzing Meal...</span>
               </>
             ) : (
-              <span>📸 Capture & Analyze</span>
+              <span>Capture & Analyze</span>
             )}
           </button>
         </section>
@@ -509,12 +509,11 @@ export default function FoodPage() {
                   onClick={() => setSelectedImage(null)}
                   className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-550 border border-red-500/20 text-white rounded-full p-1.5 text-xs select-none cursor-pointer"
                 >
-                  ✕ Remove
+                  Remove
                 </button>
               </div>
             ) : (
               <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center py-6">
-                <span className="text-3xl mb-2">🖼️</span>
                 <span className="text-xs font-semibold text-white">Select Food Photo</span>
                 <span className="text-[9px] text-gray-500 mt-1">Supports JPEG, PNG</span>
                 <input
@@ -564,7 +563,7 @@ export default function FoodPage() {
                 <div className="flex flex-col">
                   <span className="font-semibold text-white capitalize">{item.name}</span>
                   <span className="text-[9px] text-gray-500 mt-0.5 font-medium">
-                    {item.estimated ? "⚠️ AI Estimated fallback" : "✅ DB standardized portion"}
+                    {item.estimated ? "[AI Estimated fallback]" : "[DB standardized portion]"}
                   </span>
                 </div>
                 <span className="text-emerald-400 font-mono font-bold">{item.calories} kcal</span>
@@ -586,7 +585,6 @@ export default function FoodPage() {
           </div>
 
           <div className="bg-emerald-500/5 border border-emerald-500/15 p-4 rounded-xl flex items-start gap-2.5">
-            <span className="text-sm select-none">💡</span>
             <div className="flex flex-col">
               <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">AI Nutrition Tip</span>
               <p className="text-xs text-gray-300 leading-relaxed mt-1">{result.suggestion}</p>

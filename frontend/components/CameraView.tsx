@@ -252,7 +252,6 @@ export default function CameraView({ isActive, onPoseResults }: CameraViewProps)
       {/* Error Overlay */}
       {error && (
         <div className="absolute inset-0 bg-[#050505]/95 flex flex-col items-center justify-center p-6 text-center z-20">
-          <span className="text-xl mb-2">⚠️</span>
           <p className="text-xs text-red-400 font-semibold">{error}</p>
         </div>
       )}
@@ -260,7 +259,6 @@ export default function CameraView({ isActive, onPoseResults }: CameraViewProps)
       {/* Idle Overlay */}
       {!isActive && !isLoading && !error && (
         <div className="absolute inset-0 bg-[#050505]/90 flex flex-col items-center justify-center z-20">
-          <span className="text-4xl mb-3">🎥</span>
           <span className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Camera Offline</span>
         </div>
       )}

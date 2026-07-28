@@ -233,7 +233,7 @@ export default function DashboardPage() {
       {/* TOP HEADER / GREETINGS */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">Hey Champion 👋</h2>
+          <h2 className="text-lg font-bold text-white tracking-tight">Hey Champion</h2>
           <p className="text-[10px] text-gray-500 font-medium">Here is your daily fitness digest.</p>
         </div>
 
@@ -267,7 +267,6 @@ export default function DashboardPage() {
 
       {error && (
         <div className="bg-white/5 border border-white/10 rounded-xl p-5 text-center backdrop-blur-md shadow-none">
-          <span className="text-2xl mb-2 block">📋</span>
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">Connection status</h3>
           <p className="text-[11px] text-gray-500 mt-1">Unable to load dashboard data. Check backend connection.</p>
         </div>
@@ -276,7 +275,6 @@ export default function DashboardPage() {
       {/* CONDITIONAL RENDER: Empty state vs Real statistics */}
       {!hasData ? (
         <section className="bg-white/5 border border-white/10 rounded-xl p-6 text-center backdrop-blur-md shadow-none flex flex-col items-center justify-center gap-2">
-          <span className="text-3xl mb-1 select-none">🎯</span>
           <h3 className="text-sm font-bold text-white tracking-tight">No activity logged today</h3>
           <p className="text-[11px] text-gray-500 max-w-xs leading-normal">
             Start by adding your first workout, meal, or activity below.
@@ -332,18 +330,18 @@ export default function DashboardPage() {
               {showBreakdown && (
                 <div className="mt-3 text-[10px] text-gray-400 space-y-2 animate-slideUp">
                   <div className="flex justify-between items-center border-b border-white/5 pb-1.5">
-                    <span className="flex items-center gap-1.5">🏋️ Workout Volume</span>
+                    <span className="flex items-center gap-1.5">Workout Volume</span>
                     <span className="font-mono text-white font-bold">+{workoutPoints} pts</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-white/5 pb-1.5">
-                    <span className="flex items-center gap-1.5">🍱 Diet & Calories</span>
+                    <span className="flex items-center gap-1.5">Diet & Calories</span>
                     <span className="font-mono text-white font-bold">+{dietPoints} pts</span>
                   </div>
                   <div className="flex justify-between items-center pb-0.5">
-                    <span className="flex items-center gap-1.5">🏃 Steps Volume</span>
+                    <span className="flex items-center gap-1.5">Steps Volume</span>
                     <span className="font-mono text-white font-bold">+{stepsPoints} pts</span>
                   </div>
-                  <p className="text-[9px] text-gray-550 pt-1 leading-normal italic">
+                  <p className="text-[9px] text-gray-555 pt-1 leading-normal italic">
                     Breakdown rules: Workout = up to 40 pts (target 50 reps); Diet = up to 40 pts (target &le; 2000 kcal); Steps = up to 20 pts (target 8000 steps).
                   </p>
                 </div>
@@ -358,7 +356,6 @@ export default function DashboardPage() {
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
               <div className="flex justify-between items-center">
                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Calories Balance</span>
-                <span className="text-xs">🍱</span>
               </div>
               <div>
                 <div className="flex items-baseline gap-0.5 mt-2">
@@ -378,7 +375,6 @@ export default function DashboardPage() {
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
               <div className="flex justify-between items-center">
                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Workout Sessions</span>
-                <span className="text-xs">🏋️</span>
               </div>
               <div>
                 <div className="flex items-baseline gap-0.5 mt-2">
@@ -397,7 +393,6 @@ export default function DashboardPage() {
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-md flex flex-col justify-between h-32 shadow-none">
               <div className="flex justify-between items-center">
                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Daily steps</span>
-                <span className="text-xs">🚶</span>
               </div>
               <div>
                 <div className="flex items-baseline gap-0.5 mt-2">
@@ -424,7 +419,7 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-2">
               {data.workouts && data.workouts.map((w) => (
                 <div key={`w-${w.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs group transition-all">
-                  <span className="font-semibold text-white">🏋️ {formatWorkoutDisplay(w.type, w.reps)}</span>
+                  <span className="font-semibold text-white">{formatWorkoutDisplay(w.type, w.reps)}</span>
                   <button
                     onClick={() => handleDeleteLog("workout", w.id)}
                     disabled={deletingIds.includes(w.id)}
@@ -440,9 +435,9 @@ export default function DashboardPage() {
               
               {data.food && data.food.map((f) => (
                 <div key={`f-${f.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs group transition-all">
-                  <span className="font-semibold text-white">🍱 {f.food_name}</span>
+                  <span className="font-semibold text-white">{f.food_name}</span>
                   <div className="flex items-center gap-2.5">
-                    <span className="text-emerald-400 font-mono font-bold">+{f.calories} kcal</span>
+                    <span className="text-emerald-400 font-mono font-bold font-semibold">+{f.calories} kcal</span>
                     <button
                       onClick={() => handleDeleteLog("food", f.id)}
                       disabled={deletingIds.includes(f.id)}
@@ -460,7 +455,7 @@ export default function DashboardPage() {
               {data.activity && data.activity.map((a) => (
                 <div key={`a-${a.id}`} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs group transition-all">
                   <div className="flex flex-col">
-                    <span className="font-semibold text-white">🏃 {a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1)}</span>
+                    <span className="font-semibold text-white">{a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1)}</span>
                     {a.steps && a.steps > 0 ? (
                       <span className="text-[9px] text-gray-500 mt-0.5">{a.steps.toLocaleString()} steps</span>
                     ) : null}
@@ -505,9 +500,9 @@ export default function DashboardPage() {
         {/* Form Selector Tabs */}
         <div className="flex p-0.5 bg-white/5 border border-white/10 rounded-xl max-w-sm mb-5">
           {[
-            { id: "workout", label: "🏋️ Workout" },
-            { id: "food", label: "🍱 Food" },
-            { id: "activity", label: "🏃 Activity" }
+            { id: "workout", label: "Workout" },
+            { id: "food", label: "Food" },
+            { id: "activity", label: "Activity" }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -602,10 +597,10 @@ export default function DashboardPage() {
                 onChange={(e) => setActivityType(e.target.value)}
                 className="w-full bg-zinc-900 text-white border border-white/10 rounded-lg p-2 focus:outline-none text-xs cursor-pointer"
               >
-                <option value="Walk">Walk 🚶</option>
-                <option value="Run">Run 🏃</option>
-                <option value="Cycling">Cycling 🚴</option>
-                <option value="Skipping">Skipping 🦘</option>
+                <option value="Walk">Walk</option>
+                <option value="Run">Run</option>
+                <option value="Cycling">Cycling</option>
+                <option value="Skipping">Skipping</option>
                 <option value="Other">Other...</option>
               </select>
             </div>
