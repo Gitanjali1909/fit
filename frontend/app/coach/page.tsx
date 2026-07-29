@@ -54,15 +54,18 @@ export default function CoachPage() {
     fetchPlanApi(userId)
       .then((data) => {
         if (data && data.plan_content && !data.plan_content.startsWith("No active plan")) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: "saved-plan",
-              role: "assistant",
-              content: data.plan_content,
-              mode: "coach",
-            },
-          ]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === "saved-plan")) return prev;
+            return [
+              ...prev,
+              {
+                id: "saved-plan",
+                role: "assistant",
+                content: data.plan_content,
+                mode: "coach",
+              },
+            ];
+          });
         }
       })
       .catch(() => {});

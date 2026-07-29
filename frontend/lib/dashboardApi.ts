@@ -1,4 +1,4 @@
-import { API } from "./api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://fit-65of.onrender.com";
 
 export interface WorkoutLogItem {
   type: string;
@@ -47,7 +47,7 @@ export interface DashboardData {
 }
 
 export const fetchDashboardData = async (userId: string): Promise<DashboardData> => {
-  const res = await fetch(`${API}/dashboard/${userId}`, {
+  const res = await fetch(`${BASE_URL}/dashboard/${userId}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -63,7 +63,7 @@ export const fetchDashboardData = async (userId: string): Promise<DashboardData>
 };
 
 export const fetchScoreApi = async (workout: any, food: any, activity: any, userId: string) => {
-  const res = await fetch(`${API}/score`, {
+  const res = await fetch(`${BASE_URL}/score`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -74,7 +74,7 @@ export const fetchScoreApi = async (workout: any, food: any, activity: any, user
 };
 
 export const fetchInsightApi = async (workout: any, food: any, activity: any, userId: string, score?: number) => {
-  const res = await fetch(`${API}/insight`, {
+  const res = await fetch(`${BASE_URL}/insight`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -85,7 +85,7 @@ export const fetchInsightApi = async (workout: any, food: any, activity: any, us
 };
 
 export const logWorkoutApi = async (userId: string, type: string, reps: number) => {
-  const res = await fetch(`${API}/log/workout`, {
+  const res = await fetch(`${BASE_URL}/log/workout`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -96,7 +96,7 @@ export const logWorkoutApi = async (userId: string, type: string, reps: number) 
 };
 
 export const logFoodApi = async (userId: string, foodName: string, calories: number) => {
-  const res = await fetch(`${API}/log/food`, {
+  const res = await fetch(`${BASE_URL}/log/food`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -113,7 +113,7 @@ export const logActivityApi = async (
   steps?: number,
   caloriesBurned: number = 0
 ) => {
-  const res = await fetch(`${API}/log/activity`, {
+  const res = await fetch(`${BASE_URL}/log/activity`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -131,7 +131,7 @@ export const logActivityApi = async (
 
 // Plan persistence methods
 export const savePlanApi = async (userId: string, planContent: string) => {
-  const res = await fetch(`${API}/plan/save`, {
+  const res = await fetch(`${BASE_URL}/plan/save`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -142,7 +142,7 @@ export const savePlanApi = async (userId: string, planContent: string) => {
 };
 
 export const fetchPlanApi = async (userId: string) => {
-  const res = await fetch(`${API}/plan/${userId}`, {
+  const res = await fetch(`${BASE_URL}/plan/${userId}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -153,7 +153,7 @@ export const fetchPlanApi = async (userId: string) => {
 };
 
 export const resetTodayApi = async (userId: string) => {
-  const res = await fetch(`${API}/reset-today`, {
+  const res = await fetch(`${BASE_URL}/reset-today`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -164,7 +164,7 @@ export const resetTodayApi = async (userId: string) => {
 };
 
 export const deleteLogApi = async (logType: string, logId: number) => {
-  const res = await fetch(`${API}/log/${logType}/${logId}`, {
+  const res = await fetch(`${BASE_URL}/log/${logType}/${logId}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -176,4 +176,3 @@ export const deleteLogApi = async (logType: string, logId: number) => {
 export const deleteFoodLogApi = async (logId: number) => {
   return deleteLogApi("food", logId);
 };
-

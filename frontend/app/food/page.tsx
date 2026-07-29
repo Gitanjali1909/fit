@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { getOrCreateUserId } from "@/lib/user";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://fit-65of.onrender.com";
 
 interface FoodItem {
   name: string;
@@ -112,7 +112,7 @@ export default function FoodPage() {
       }
       const payload = { food: foodInput.trim(), user_id: userId };
 
-      const res = await fetch(`${API}/food/analyze`, {
+      const res = await fetch(`${BASE_URL}/food/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -196,7 +196,7 @@ export default function FoodPage() {
   const runImageAnalysis = async (base64Data: string) => {
     try {
       const userId = getOrCreateUserId();
-      const res = await fetch(`${API}/food/analyze`, {
+      const res = await fetch(`${BASE_URL}/food/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

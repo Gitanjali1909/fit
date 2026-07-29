@@ -1,6 +1,7 @@
 import { getOrCreateUserId } from "./user";
 
-export const API = "https://fit-65of.onrender.com";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://fit-65of.onrender.com";
+
 export interface HistoryMessage {
   role: "user" | "assistant";
   content: string;
@@ -20,7 +21,7 @@ export async function sendMessage(
   activity: RecentActivityPayload
 ) {
   const userId = getOrCreateUserId();
-  const res = await fetch(`${API}/coach/chat`, {
+  const res = await fetch(`${BASE_URL}/coach/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -39,3 +40,23 @@ export async function sendMessage(
 
   return res.json();
 }
+
+export async function analyzeFood(food: string, userId: string) {
+  const res = await fetch(`${BASE_URL}/food/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ food, user_id: userId }),
+  });
+  return res.json();
+}
+
+export async function getDashboard(userId: string) {
+  const res = await fetch(`${BASE_URL}/dashboard/${userId}`);
+  return res.json();
+}
+
+export const API = {
+  sendMessage,
+  analyzeFood,
+  getDashboard,
+};
