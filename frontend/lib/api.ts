@@ -1,7 +1,6 @@
 import { getOrCreateUserId } from "./user";
 
-export const API = "http://127.0.0.1:8000";
-
+export const API = "https://fit-65of.onrender.com";
 export interface HistoryMessage {
   role: "user" | "assistant";
   content: string;
