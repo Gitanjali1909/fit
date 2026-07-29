@@ -6,7 +6,6 @@ load_dotenv()
 
 app = FastAPI(title="Fit AI API")
 
-# Add CORS Middleware to enable communication with Next.js frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Adjust in production

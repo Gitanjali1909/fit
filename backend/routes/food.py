@@ -35,12 +35,35 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
         else:
             result = analyze_food_text_ai(req.food)
 
+    status = result.get("status", "success")
+
+    # Guard: If no items returned, reject immediately. Do not log.
+    if status == "success" and not result.get("items"):
+        return {
+            "items": [],
+            "total_calories": 0,
+            "suggestion": "No valid food detected.",
+            "status": "rejected",
+            "logged": False,
+            "log_id": None
+        }
+
+    # Guard: If pipeline analysis failed (error), return rejected with error message.
+    if status == "error":
+        return {
+            "items": [],
+            "total_calories": 0,
+            "suggestion": result.get("suggestion", "Image analysis failed."),
+            "status": "rejected",
+            "logged": False,
+            "log_id": None
+        }
+
     user_id = req.user_id or "1"
     ensure_user_exists(db, user_id)
     
     logged = False
     log_id = None
-    status = result.get("status", "success")
     
     if status == "success":
         item_names = [item.get("name", "") for item in result.get("items", [])]

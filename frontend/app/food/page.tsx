@@ -13,7 +13,7 @@ interface FoodItem {
 }
 
 interface FoodResult {
-  status: "success" | "not_food" | "unknown_food";
+  status: "success" | "not_food" | "unknown_food" | "rejected";
   items: FoodItem[];
   total_calories: number;
   suggestion: string;
@@ -128,6 +128,8 @@ export default function FoodPage() {
         setError("No food detected. Please enter or describe food items.");
       } else if (data.status === "unknown_food") {
         setError("Food not recognized. We only estimate calories for standardized foods in our database.");
+      } else if (data.status === "rejected") {
+        setError("No valid food detected. Please check your inputs.");
       } else {
         setResult(data);
       }
@@ -210,6 +212,8 @@ export default function FoodPage() {
         setError("No food detected. Please capture a clear photo of your meal.");
       } else if (data.status === "unknown_food") {
         setError("Food not recognized. We only estimate calories for standardized foods in our database.");
+      } else if (data.status === "rejected") {
+        setError("No valid food detected. Please check your inputs.");
       } else {
         setResult(data);
       }

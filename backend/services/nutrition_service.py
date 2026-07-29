@@ -109,51 +109,110 @@ def normalize_food(name: str) -> str:
 
     return name
 
-class FoodItemNameQty(BaseModel):
+# Vision models expect only item names. Quantities default to 1 on backend.
+class FoodItemVisionName(BaseModel):
+    name: str
+
+class FoodVisionResponse(BaseModel):
+    status: str
+    items: List[FoodItemVisionName]
+
+# Text models extract both food names and mentioned quantities.
+class FoodItemTextNameQty(BaseModel):
     name: str
     quantity: float
 
-class FoodDetectionResponse(BaseModel):
+class FoodTextResponse(BaseModel):
     status: str
-    items: List[FoodItemNameQty]
+    items: List[FoodItemTextNameQty]
 
-MASTER_SYSTEM_INSTRUCTION = """You are a FOOD DETECTION module for a fitness app.
+VISION_SYSTEM_INSTRUCTION = """You are a FOOD VISION DETECTOR.
 
-Your job is ONLY to identify food items.
-NOT calories. NOT nutrition.
+Your job is NOT to be smart.
+Your job is to be STRICT and RELIABLE.
 
-STRICT RULES:
+Step 1: Determine if the image contains FOOD.
 
-1. First decide:
-   Is this FOOD or NOT?
-
-- If NOT food -> return:
+Rules:
+- If NO food -> return:
   { "status": "not_food", "items": [] }
 
-2. If it IS food:
-
-- Identify only clearly visible food items
 - Do NOT guess
 - Do NOT hallucinate
-- Keep list small and realistic
-- Return ONLY simple food names. Use common names only (e.g. "cake", "rice", "dal"). Do NOT describe. Do NOT add adjectives. Do NOT say "slice of", "piece of", "delicious", etc.
-  - BAD: "slice of chocolate cake with frosting"
-  - GOOD: "cake"
+- Humans, objects, random scenes = NOT FOOD
 
-3. Quantity rules:
+---
 
-- For image inputs:
-  ALWAYS return quantity = 1
-- For text inputs:
-  extract numbers if clearly present
+Step 2: If food is present
 
-4. Output ONLY JSON in this format:
+Extract ONLY clearly visible food items.
+
+Rules:
+- Keep it simple (1-3 items max)
+- Use common names (rice, egg, roti, cake, etc.)
+- Do NOT add items that are not clearly visible
+
+---
+
+Step 3: Output STRICT JSON ONLY
+
 {
   "status": "success",
   "items": [
-    { "name": "food_name", "quantity": number }
+    { "name": "string" }
   ]
 }
+
+---
+
+IMPORTANT:
+- Do NOT calculate calories
+- Do NOT estimate quantity
+- Do NOT explain anything
+- If unsure -> return empty list
+"""
+
+TEXT_SYSTEM_INSTRUCTION = """You are a FOOD TEXT DETECTOR.
+
+Your job is to identify common, real-world food items and their quantities from the description.
+
+Step 1: Determine if the text describes FOOD.
+
+Rules:
+- If NO food -> return:
+  { "status": "not_food", "items": [] }
+
+- Do NOT guess
+- Do NOT hallucinate
+
+---
+
+Step 2: If food is present
+
+Extract food items and their mentioned quantities.
+
+Rules:
+- Keep it simple (1-3 items max)
+- Use common names (rice, egg, roti, etc.)
+- Extract numbers if clearly present, otherwise default to 1.
+
+---
+
+Step 3: Output STRICT JSON ONLY
+
+{
+  "status": "success",
+  "items": [
+    { "name": "string", "quantity": number }
+  ]
+}
+
+---
+
+IMPORTANT:
+- Do NOT calculate calories
+- Do NOT explain anything
+- If unsure -> return empty list
 """
 
 def clean_json_string(text: str) -> str:
@@ -259,10 +318,19 @@ def generate_health_suggestion(items_list) -> str:
     except Exception:
         return "Good start. Pair your meal with plenty of water and daily exercise."
 
-def parse_and_validate_response(raw_response: str) -> dict:
+def parse_and_validate_vision_response(raw_response: str) -> dict:
     cleaned = clean_json_string(raw_response)
     parsed_dict = json.loads(cleaned)
-    response_model = FoodDetectionResponse(**parsed_dict)
+    response_model = FoodVisionResponse(**parsed_dict)
+    return {
+        "status": response_model.status,
+        "items": [{"name": item.name, "quantity": 1.0} for item in response_model.items]
+    }
+
+def parse_and_validate_text_response(raw_response: str) -> dict:
+    cleaned = clean_json_string(raw_response)
+    parsed_dict = json.loads(cleaned)
+    response_model = FoodTextResponse(**parsed_dict)
     return {
         "status": response_model.status,
         "items": [item.dict() for item in response_model.items]
@@ -273,7 +341,7 @@ def analyze_food_text_ai(food_description: str):
         try:
             chat_completion = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": MASTER_SYSTEM_INSTRUCTION},
+                    {"role": "system", "content": TEXT_SYSTEM_INSTRUCTION},
                     {"role": "user", "content": f"Analyze this food: {food_description}"},
                 ],
                 model="llama-3.3-70b-versatile",
@@ -283,7 +351,7 @@ def analyze_food_text_ai(food_description: str):
             raw_response = chat_completion.choices[0].message.content
             print("AI RESPONSE:", raw_response)
             
-            parsed = parse_and_validate_response(raw_response)
+            parsed = parse_and_validate_text_response(raw_response)
             print("AFTER PARSING (text):", parsed)
             
             if parsed.get("status") == "not_food" or not parsed.get("items", []):
@@ -308,7 +376,12 @@ def analyze_food_text_ai(food_description: str):
         except Exception as e:
             print(f"Text analysis failed on attempt {attempt+1}: {e}")
             if attempt == 1:
-                return get_fallback_nutrition(food_description)
+                return {
+                    "status": "error",
+                    "items": [],
+                    "total_calories": 0,
+                    "suggestion": "Text description analysis failed. Please try describing simplified items."
+                }
 
 def analyze_food_image_ai(base64_image: str):
     if "," in base64_image:
@@ -318,7 +391,7 @@ def analyze_food_image_ai(base64_image: str):
         try:
             chat_completion = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": MASTER_SYSTEM_INSTRUCTION},
+                    {"role": "system", "content": VISION_SYSTEM_INSTRUCTION},
                     {
                         "role": "user",
                         "content": [
@@ -332,14 +405,14 @@ def analyze_food_image_ai(base64_image: str):
                         ]
                     }
                 ],
-                model="llama-3.2-11b-vision-preview",
+                model="qwen/qwen3.6-27b",
                 temperature=0,
                 response_format={"type": "json_object"}
             )
             raw_response = chat_completion.choices[0].message.content
             print("AI RESPONSE:", raw_response)
             
-            parsed = parse_and_validate_response(raw_response)
+            parsed = parse_and_validate_vision_response(raw_response)
             print("AFTER PARSING (image):", parsed)
             
             if parsed.get("status") == "not_food" or not parsed.get("items", []):
@@ -364,12 +437,9 @@ def analyze_food_image_ai(base64_image: str):
         except Exception as e:
             print(f"Image analysis failed on attempt {attempt+1}: {e}")
             if attempt == 1:
-                return get_fallback_nutrition("scanned food")
-
-def get_fallback_nutrition(description: str):
-    return {
-        "status": "unknown_food",
-        "items": [],
-        "total_calories": 0,
-        "suggestion": "Estimation unavailable for this meal. Please verify the food item spelling."
-    }
+                return {
+                    "status": "error",
+                    "items": [],
+                    "total_calories": 0,
+                    "suggestion": "Image analysis failed. Please try manual text entry or ensure your image is clear."
+                }
