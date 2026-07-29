@@ -11,96 +11,147 @@ load_dotenv()
 # Setup Groq client locally to avoid circular dependencies
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-FOOD_DATABASE = {
-    "egg": {"unit": "piece", "calories_per_unit": 70},
-    "roti": {"unit": "piece", "calories_per_unit": 120},
-    "chapati": {"unit": "piece", "calories_per_unit": 120},
-    "rice": {"unit": "bowl", "calories_per_unit": 200},
-    "dal": {"unit": "bowl", "calories_per_unit": 180},
-    "paneer": {"unit": "serving", "calories_per_unit": 265},
-    "chicken": {"unit": "gram", "calories_per_unit": 1.65},
-    "milk": {"unit": "cup", "calories_per_unit": 120},
-    "banana": {"unit": "piece", "calories_per_unit": 105},
-    "apple": {"unit": "piece", "calories_per_unit": 95},
-    "bread": {"unit": "piece", "calories_per_unit": 80},
-    "butter": {"unit": "gram", "calories_per_unit": 7.17},
-    "curd": {"unit": "bowl", "calories_per_unit": 100},
-    "oats": {"unit": "bowl", "calories_per_unit": 150},
-    "avocado": {"unit": "piece", "calories_per_unit": 160},
-    "salad": {"unit": "bowl", "calories_per_unit": 50},
-    "protein shake": {"unit": "cup", "calories_per_unit": 150},
-    "fish": {"unit": "gram", "calories_per_unit": 2.06},
-    "almonds": {"unit": "piece", "calories_per_unit": 7},
-    "egg whites": {"unit": "piece", "calories_per_unit": 17},
-    "coffee": {"unit": "cup", "calories_per_unit": 2},
-    "tea": {"unit": "cup", "calories_per_unit": 30}
+CALORIE_MAP = {
+    "egg": 70,
+    "boiled egg": 70,
+    "omelette": 150,
+    "roti": 120,
+    "chapati": 120,
+    "rice": 200,
+    "jeera rice": 220,
+    "dal": 180,
+    "dal tadka": 220,
+    "paneer": 265,
+    "paneer butter masala": 320,
+    "chicken": 250,
+    "chicken curry": 300,
+    "grilled chicken": 220,
+    "fish": 200,
+    "fried fish": 300,
+    "biryani": 350,
+    "veg biryani": 300,
+    "poha": 250,
+    "upma": 230,
+    "idli": 60,
+    "dosa": 180,
+    "masala dosa": 250,
+    "vada": 150,
+    "samosa": 260,
+    "pakora": 200,
+    "paratha": 250,
+    "aloo paratha": 300,
+    "butter naan": 260,
+    "naan": 220,
+    "rajma": 220,
+    "chole": 250,
+    "bhindi": 150,
+    "aloo sabzi": 180,
+    "mixed veg": 150,
+    "palak paneer": 280,
+    "kadhi": 200,
+    "curd": 100,
+    "lassi": 180,
+    "milk": 120,
+    "tea": 80,
+    "coffee": 50,
+    "banana": 105,
+    "apple": 95,
+    "mango": 200,
+    "orange": 80,
+    "bread": 70,
+    "butter": 100,
+    "jam": 50,
+    "cake": 300,
+    "ice cream": 200,
+    "chocolate": 150
 }
 
-PORTION_FACTORS = {
-    "small": 0.8,
-    "medium": 1.0,
-    "large": 1.3
-}
+def clean_name(name: str) -> str:
+    words_to_remove = [
+        "slice", "piece", "of", "with",
+        "fresh", "delicious", "homemade"
+    ]
+    name = name.lower()
+    for w in words_to_remove:
+        name = name.replace(w, " ")
+    name = re.sub(r'\s+', ' ', name)
+    return name.strip()
 
-def normalize(name: str) -> str:
-    n = name.lower().strip()
-    if "egg" in n:
-        if "white" in n:
-            return "egg whites"
+def match_food(name: str) -> str:
+    name = name.lower()
+    for key in CALORIE_MAP:
+        if key in name:
+            return key
+    
+    # extra fallback (VERY IMPORTANT)
+    if "cake" in name:
+        return "cake"
+    if "ice cream" in name:
+        return "ice cream"
+    if "chocolate" in name:
+        return "chocolate"
+        
+    return None
+
+def normalize_food(name: str) -> str:
+    name = name.lower().strip()
+
+    if "egg" in name:
         return "egg"
-    if "rice" in n:
-        return "rice"
-    if "roti" in n or "chapati" in n:
+    if "roti" in name or "chapati" in name:
         return "roti"
-    if "paneer" in n:
-        return "paneer"
-    if "apple" in n:
-        return "apple"
-    if "banana" in n:
-        return "banana"
-    if "milk" in n:
-        return "milk"
-    if "chicken" in n:
-        return "chicken"
-    if "dal" in n or "lentil" in n:
+    if "rice" in name:
+        return "rice"
+    if "dal" in name:
         return "dal"
-    return n
+    if "paneer" in name:
+        return "paneer"
 
-class FoodItemName(BaseModel):
+    return name
+
+class FoodItemNameQty(BaseModel):
     name: str
+    quantity: float
 
-class FoodValidationResponse(BaseModel):
-    is_food: bool
-    items: List[FoodItemName]
+class FoodDetectionResponse(BaseModel):
+    status: str
+    items: List[FoodItemNameQty]
 
-SYSTEM_INSTRUCTION_TEXT = """You are a food validation and recognition system.
-Analyze the input text.
+MASTER_SYSTEM_INSTRUCTION = """You are a FOOD DETECTION module for a fitness app.
 
-Determine:
-1. Is the text describing actual food items/meals/beverages? (true/false)
-2. If true, extract all clearly mentioned food items. Do not guess, do not hallucinate unseen items.
+Your job is ONLY to identify food items.
+NOT calories. NOT nutrition.
 
-Return ONLY a JSON response in the following format:
+STRICT RULES:
+
+1. First decide:
+   Is this FOOD or NOT?
+
+- If NOT food -> return:
+  { "status": "not_food", "items": [] }
+
+2. If it IS food:
+
+- Identify only clearly visible food items
+- Do NOT guess
+- Do NOT hallucinate
+- Keep list small and realistic
+- Return ONLY simple food names. Use common names only (e.g. "cake", "rice", "dal"). Do NOT describe. Do NOT add adjectives. Do NOT say "slice of", "piece of", "delicious", etc.
+  - BAD: "slice of chocolate cake with frosting"
+  - GOOD: "cake"
+
+3. Quantity rules:
+
+- For image inputs:
+  ALWAYS return quantity = 1
+- For text inputs:
+  extract numbers if clearly present
+
+4. Output ONLY JSON in this format:
 {
-  "is_food": boolean,
+  "status": "success",
   "items": [
-    { "name": "string" }
-  ]
-}
-"""
-
-SYSTEM_INSTRUCTION_IMAGE = """You are a food validation and recognition system.
-Analyze the image.
-
-Determine:
-1. Is the image depicting food/meals/beverages? (true/false)
-2. If true, extract all clearly visible food items. Do not guess, do not hallucinate unseen items.
-
-Return ONLY a JSON response in the following format:
-{
-  "is_food": boolean,
-  "items": [
-    { "name": "string" }
+    { "name": "food_name", "quantity": number }
   ]
 }
 """
@@ -118,7 +169,7 @@ def estimate_item_calories_fallback(item_name: str) -> int:
     try:
         chat_completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a calorie estimation API. Given a food name, estimate standard calories for 1 normal serving. Return ONLY an integer count of calories. If you are totally unsure, return 0. Do not write text, only the integer number."},
+                {"role": "system", "content": "You are a calorie estimation API. Given a food name, estimate standard calories for 1 normal serving. Return ONLY an integer count of calories. If you are totally unsure, return 0. Do not write text, only the integer number. Do not use emojis."},
                 {"role": "user", "content": f"Food item: {item_name}"}
             ],
             model="llama-3.3-70b-versatile",
@@ -132,37 +183,45 @@ def estimate_item_calories_fallback(item_name: str) -> int:
     except Exception:
         return 0
 
-def calculate_calories(items_list: list, portion_size: str = "medium") -> dict:
-    portion_factor = PORTION_FACTORS.get(portion_size.lower(), 1.0)
+def calculate_calories(items_list: list) -> dict:
     processed_items = []
     total_calories = 0
     status = "success"
     
     for item in items_list:
         raw_name = item.get("name", "").lower().strip()
+        qty = item.get("quantity", 1.0)
         if not raw_name:
             continue
             
-        normalized_name = normalize(raw_name)
+        cleaned = clean_name(raw_name)
+        matched = match_food(cleaned)
         
-        # Check if in DB
-        if normalized_name in FOOD_DATABASE:
-            calories_per_unit = FOOD_DATABASE[normalized_name]["calories_per_unit"]
-            calories = int(round(calories_per_unit * portion_factor))
+        print("RAW:", raw_name)
+        print("CLEAN:", cleaned)
+        print("MATCH:", matched)
+        
+        # Check if in CALORIE_MAP
+        if matched and matched in CALORIE_MAP:
+            normalized_name = normalize_food(matched)
+            calories_per_unit = CALORIE_MAP[normalized_name]
+            calories = int(round(calories_per_unit * qty))
             total_calories += calories
             processed_items.append({
                 "name": normalized_name,
+                "quantity": qty,
                 "calories": calories,
                 "estimated": False
             })
         else:
             # Try AI fallback estimation
-            est_cals = estimate_item_calories_fallback(raw_name)
+            est_cals = estimate_item_calories_fallback(cleaned)
             if est_cals > 0:
-                calories = int(round(est_cals * portion_factor))
+                calories = int(round(est_cals * qty))
                 total_calories += calories
                 processed_items.append({
-                    "name": raw_name,
+                    "name": cleaned,
+                    "quantity": qty,
                     "calories": calories,
                     "estimated": True
                 })
@@ -170,6 +229,7 @@ def calculate_calories(items_list: list, portion_size: str = "medium") -> dict:
                 status = "unknown_food"
                 processed_items.append({
                     "name": f"{raw_name} (Food not recognized)",
+                    "quantity": qty,
                     "calories": 0,
                     "estimated": True
                 })
@@ -185,56 +245,11 @@ def calculate_calories(items_list: list, portion_size: str = "medium") -> dict:
         "total_calories": total_calories if status == "success" else 0
     }
 
-def analyze_food_manual(name: str, quantity: float, portion_size: str = "medium") -> dict:
-    normalized_name = normalize(name)
-    portion_factor = PORTION_FACTORS.get(portion_size.lower(), 1.0)
-    
-    if normalized_name in FOOD_DATABASE:
-        calories_per_unit = FOOD_DATABASE[normalized_name]["calories_per_unit"]
-        calories = int(round(calories_per_unit * quantity * portion_factor))
-        
-        return {
-            "status": "success",
-            "items": [
-                {
-                    "name": normalized_name,
-                    "calories": calories,
-                    "estimated": False
-                }
-            ],
-            "total_calories": calories,
-            "suggestion": "Log recorded. Stay consistent with your diet!"
-        }
-    else:
-        # Fallback estimation for custom manual entries
-        est_cals = estimate_item_calories_fallback(name)
-        if est_cals > 0:
-            calories = int(round(est_cals * quantity * portion_factor))
-            return {
-                "status": "success",
-                "items": [
-                    {
-                        "name": name,
-                        "calories": calories,
-                        "estimated": True
-                    }
-                ],
-                "total_calories": calories,
-                "suggestion": "Log recorded using AI estimated calories. Stay consistent!"
-            }
-        else:
-            return {
-                "status": "unknown_food",
-                "items": [],
-                "total_calories": 0,
-                "suggestion": "Estimation unavailable for this meal. Please verify the food item spelling."
-            }
-
 def generate_health_suggestion(items_list) -> str:
     try:
         chat_completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a supportive nutrition coach. Give a short, one-sentence healthy suggestion based on this meal. Keep it to 15 words or less."},
+                {"role": "system", "content": "You are a supportive nutrition coach. Give a short, one-sentence healthy suggestion based on this meal. Keep it to 15 words or less. Do not use emojis."},
                 {"role": "user", "content": f"Meal items: {items_list}"}
             ],
             model="llama-3.3-70b-versatile",
@@ -242,23 +257,23 @@ def generate_health_suggestion(items_list) -> str:
         )
         return chat_completion.choices[0].message.content.strip()
     except Exception:
-        return "Good start! Pair your meal with plenty of water and daily exercise."
+        return "Good start. Pair your meal with plenty of water and daily exercise."
 
 def parse_and_validate_response(raw_response: str) -> dict:
     cleaned = clean_json_string(raw_response)
     parsed_dict = json.loads(cleaned)
-    response_model = FoodValidationResponse(**parsed_dict)
+    response_model = FoodDetectionResponse(**parsed_dict)
     return {
-        "is_food": response_model.is_food,
+        "status": response_model.status,
         "items": [item.dict() for item in response_model.items]
     }
 
-def analyze_food_text_ai(food_description: str, portion_size: str = "medium"):
+def analyze_food_text_ai(food_description: str):
     for attempt in range(2):
         try:
             chat_completion = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": SYSTEM_INSTRUCTION_TEXT},
+                    {"role": "system", "content": MASTER_SYSTEM_INSTRUCTION},
                     {"role": "user", "content": f"Analyze this food: {food_description}"},
                 ],
                 model="llama-3.3-70b-versatile",
@@ -266,12 +281,12 @@ def analyze_food_text_ai(food_description: str, portion_size: str = "medium"):
                 response_format={"type": "json_object"}
             )
             raw_response = chat_completion.choices[0].message.content
-            print("AI RAW (text):", raw_response)
+            print("AI RESPONSE:", raw_response)
             
-            validation = parse_and_validate_response(raw_response)
-            print("AFTER VALIDATION (text):", validation)
+            parsed = parse_and_validate_response(raw_response)
+            print("AFTER PARSING (text):", parsed)
             
-            if not validation.get("is_food", False) or not validation.get("items", []):
+            if parsed.get("status") == "not_food" or not parsed.get("items", []):
                 return {
                     "status": "not_food",
                     "items": [],
@@ -279,7 +294,7 @@ def analyze_food_text_ai(food_description: str, portion_size: str = "medium"):
                     "suggestion": "No food detected in your description. Please try describing food."
                 }
             
-            calc_result = calculate_calories(validation.get("items", []), portion_size)
+            calc_result = calculate_calories(parsed.get("items", []))
             print("FINAL CALC (text):", calc_result)
             
             suggestion = generate_health_suggestion(calc_result.get("items", []))
@@ -295,7 +310,7 @@ def analyze_food_text_ai(food_description: str, portion_size: str = "medium"):
             if attempt == 1:
                 return get_fallback_nutrition(food_description)
 
-def analyze_food_image_ai(base64_image: str, portion_size: str = "medium"):
+def analyze_food_image_ai(base64_image: str):
     if "," in base64_image:
         base64_image = base64_image.split(",")[1]
 
@@ -303,7 +318,7 @@ def analyze_food_image_ai(base64_image: str, portion_size: str = "medium"):
         try:
             chat_completion = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": SYSTEM_INSTRUCTION_IMAGE},
+                    {"role": "system", "content": MASTER_SYSTEM_INSTRUCTION},
                     {
                         "role": "user",
                         "content": [
@@ -322,12 +337,12 @@ def analyze_food_image_ai(base64_image: str, portion_size: str = "medium"):
                 response_format={"type": "json_object"}
             )
             raw_response = chat_completion.choices[0].message.content
-            print("AI RAW (image):", raw_response)
+            print("AI RESPONSE:", raw_response)
             
-            validation = parse_and_validate_response(raw_response)
-            print("AFTER VALIDATION (image):", validation)
+            parsed = parse_and_validate_response(raw_response)
+            print("AFTER PARSING (image):", parsed)
             
-            if not validation.get("is_food", False) or not validation.get("items", []):
+            if parsed.get("status") == "not_food" or not parsed.get("items", []):
                 return {
                     "status": "not_food",
                     "items": [],
@@ -335,7 +350,7 @@ def analyze_food_image_ai(base64_image: str, portion_size: str = "medium"):
                     "suggestion": "No food detected in this image. Please capture a clear meal photo."
                 }
             
-            calc_result = calculate_calories(validation.get("items", []), portion_size)
+            calc_result = calculate_calories(parsed.get("items", []))
             print("FINAL CALC (image):", calc_result)
             
             suggestion = generate_health_suggestion(calc_result.get("items", []))

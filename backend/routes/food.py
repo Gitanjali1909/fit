@@ -6,7 +6,7 @@ from typing import Optional
 
 from db.session import get_db
 from db.models import FoodLog
-from services.nutrition_service import analyze_food_text_ai, analyze_food_image_ai, analyze_food_manual
+from services.nutrition_service import analyze_food_text_ai, analyze_food_image_ai
 from services.db_service import ensure_user_exists
 
 router = APIRouter()
@@ -16,16 +16,13 @@ class FoodAnalyzeRequest(BaseModel):
     quantity: Optional[float] = None
     food: Optional[str] = None
     image: Optional[str] = None
-    portion_size: Optional[str] = "medium"
+    portion_size: Optional[str] = None
     user_id: Optional[str] = "1"
 
 @router.post("/analyze")
 async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
-    portion = req.portion_size or "medium"
-    
-    # 1. Determine if this is a manual-first structured log (bypassing AI)
     if req.name is not None and req.quantity is not None:
-        result = analyze_food_manual(req.name, req.quantity, portion)
+        result = analyze_food_text_ai(f"{req.quantity} {req.name}")
     else:
         if not req.image and not req.food:
             raise HTTPException(
@@ -33,13 +30,11 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
                 detail="Provide either direct food name + quantity, a food description text, or camera image base64 data."
             )
         
-        # Analyze food using Groq AI (Vision vs Text model)
         if req.image:
-            result = analyze_food_image_ai(req.image, portion)
+            result = analyze_food_image_ai(req.image)
         else:
-            result = analyze_food_text_ai(req.food, portion)
+            result = analyze_food_text_ai(req.food)
 
-    # 2. Log to Database under user_id ONLY IF status is success
     user_id = req.user_id or "1"
     ensure_user_exists(db, user_id)
     
@@ -48,7 +43,6 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
     status = result.get("status", "success")
     
     if status == "success":
-        # Construct combined item names for logging
         item_names = [item.get("name", "") for item in result.get("items", [])]
         combined_name = ", ".join(filter(None, item_names)) or req.name or req.food or "Logged Meal"
         total_cals = result.get("total_calories", 0)
@@ -78,4 +72,3 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
         "logged": logged,
         "log_id": log_id
     }
-

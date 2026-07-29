@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { API } from "@/lib/api";
 import { getOrCreateUserId } from "@/lib/user";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface FoodItem {
   name: string;
+  quantity: number;
   calories: number;
   estimated: boolean;
 }
@@ -50,12 +52,6 @@ export default function FoodPage() {
   const [result, setResult] = useState<FoodResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Manual structured inputs
-  const [useCustomText, setUseCustomText] = useState(false);
-  const [manualFood, setManualFood] = useState("egg");
-  const [manualQty, setManualQty] = useState(1);
-  const [portionSize, setPortionSize] = useState<"small" | "medium" | "large">("medium");
-
   // Upload state
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -64,8 +60,6 @@ export default function FoodPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [streamActive, setStreamActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-
-  const selectedFoodConfig = COMMON_FOODS.find((f) => f.id === manualFood) || COMMON_FOODS[0];
 
   const startCamera = async () => {
     try {
@@ -112,17 +106,11 @@ export default function FoodPage() {
 
     try {
       const userId = getOrCreateUserId();
-      let payload = {};
-
-      if (useCustomText) {
-        if (!foodInput.trim()) {
-          setLoading(false);
-          return;
-        }
-        payload = { food: foodInput.trim(), portion_size: portionSize, user_id: userId };
-      } else {
-        payload = { name: manualFood, quantity: Number(manualQty), portion_size: portionSize, user_id: userId };
+      if (!foodInput.trim()) {
+        setLoading(false);
+        return;
       }
+      const payload = { food: foodInput.trim(), user_id: userId };
 
       const res = await fetch(`${API}/food/analyze`, {
         method: "POST",
@@ -211,7 +199,7 @@ export default function FoodPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ image: base64Data, portion_size: portionSize, user_id: userId }),
+        body: JSON.stringify({ image: base64Data, user_id: userId }),
       });
 
       if (!res.ok) throw new Error("Vision estimation failed");
@@ -237,7 +225,6 @@ export default function FoodPage() {
     setError(null);
     setFoodInput("");
     setSelectedImage(null);
-    setManualQty(1);
     if (tab === "scan") {
       startCamera();
     }
@@ -255,7 +242,7 @@ export default function FoodPage() {
         </div>
         <div>
           <h1 className="text-xs font-semibold uppercase tracking-widest text-white">Food Scanner</h1>
-          <p className="text-[9px] text-gray-500 font-medium uppercase tracking-wider">Nutrition Calculator</p>
+          <p className="text-[9px] text-gray-555 font-medium uppercase tracking-wider">Nutrition Calculator</p>
         </div>
       </div>
 
@@ -285,33 +272,6 @@ export default function FoodPage() {
         ))}
       </div>
 
-      {/* PORTION SIZE SELECTOR */}
-      <div className="flex flex-col gap-1.5 max-w-sm">
-        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-          Portion Size
-        </label>
-        <div className="flex p-0.5 bg-white/5 border border-white/10 rounded-xl">
-          {[
-            { id: "small", label: "Small (0.8x)" },
-            { id: "medium", label: "Medium (1.0x)" },
-            { id: "large", label: "Large (1.3x)" }
-          ].map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setPortionSize(item.id as any)}
-              className={`flex-1 py-1.5 text-center rounded-lg text-[10px] font-semibold transition-all active:scale-95 cursor-pointer ${
-                portionSize === item.id
-                  ? "bg-emerald-500 text-black shadow-sm"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* ERROR TOAST */}
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl flex items-center justify-between text-xs text-red-400 backdrop-blur-md animate-slideUp">
@@ -331,104 +291,61 @@ export default function FoodPage() {
       {/* 1. MANUAL INPUT FORM (PRIMARY) */}
       {tab === "manual" && !result && (
         <section className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md shadow-none space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              onClick={() => {
-                setUseCustomText(false);
-                setError(null);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                !useCustomText 
-                  ? "bg-white/10 text-white border border-white/20" 
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Structured Log
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setUseCustomText(true);
-                setError(null);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                useCustomText 
-                  ? "bg-white/10 text-white border border-white/20" 
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Natural Text
-            </button>
+          <div>
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider">Manual Meal Logger</h2>
+            <p className="text-[9px] text-gray-550 font-medium">Type your meal items with quantities below</p>
           </div>
 
           <form onSubmit={handleManualAnalyze} className="space-y-4">
-            {!useCustomText ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="food-select" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                    Select Food Item
-                  </label>
-                  <select
-                    id="food-select"
-                    value={manualFood}
-                    onChange={(e) => setManualFood(e.target.value)}
-                    className="w-full bg-neutral-900 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2.5 text-xs text-white outline-none transition-all"
-                    disabled={loading}
-                  >
-                    {COMMON_FOODS.map((food) => (
-                      <option key={food.id} value={food.id} className="bg-neutral-950 text-white">
-                        {food.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="food-desc" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                Describe your meal
+              </label>
+              <textarea
+                id="food-desc"
+                rows={3}
+                value={foodInput}
+                onChange={(e) => setFoodInput(e.target.value)}
+                placeholder="e.g. 2 eggs + 1 roti + dal"
+                className="w-full bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-3 text-xs text-white outline-none transition-all placeholder:text-gray-650 resize-none"
+                required
+                disabled={loading}
+              />
+            </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="qty-input" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                    Quantity ({selectedFoodConfig.unit}s)
-                  </label>
-                  <input
-                    id="qty-input"
-                    type="number"
-                    min="0.1"
-                    max="1000"
-                    step="0.1"
-                    value={manualQty}
-                    onChange={(e) => setManualQty(Number(e.target.value))}
-                    className="w-full bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2.5 text-xs text-white outline-none transition-all font-mono"
-                    disabled={loading}
-                    required
-                  />
-                </div>
+            {/* Quick Addition Chips */}
+            <div className="space-y-1.5">
+              <span className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Quick add items</span>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                {COMMON_FOODS.slice(0, 12).map((food) => (
+                  <button
+                    key={food.id}
+                    type="button"
+                    onClick={() => {
+                      const cleanInput = foodInput.trim();
+                      if (!cleanInput) {
+                        setFoodInput(`1 ${food.label.toLowerCase()}`);
+                      } else {
+                        setFoodInput(`${cleanInput} + 1 ${food.label.toLowerCase()}`);
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-gray-300 hover:text-white rounded-lg transition-all active:scale-95 cursor-pointer"
+                  >
+                    + {food.label}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="food-desc" className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                  Describe what you ate
-                </label>
-                <input
-                  id="food-desc"
-                  type="text"
-                  value={foodInput}
-                  onChange={(e) => setFoodInput(e.target.value)}
-                  placeholder="e.g. 2 eggs and a bowl of dal"
-                  className="w-full bg-white/5 border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-3 text-xs text-white outline-none transition-all placeholder:text-gray-650"
-                  required
-                  disabled={loading}
-                />
-              </div>
-            )}
+            </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !foodInput.trim()}
               className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-white/5 disabled:text-gray-600 text-black font-semibold text-xs uppercase tracking-wider py-3 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-black animate-spin" />
-                  <span>Calculating...</span>
+                  <span>Analyzing...</span>
                 </>
               ) : (
                 <span>Log Meal</span>
@@ -468,7 +385,7 @@ export default function FoodPage() {
               </div>
 
               {!streamActive && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/85 text-xs text-gray-500">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/85 text-xs text-gray-505">
                   Initializing camera feed...
                 </div>
               )}
