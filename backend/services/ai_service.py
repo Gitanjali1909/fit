@@ -8,111 +8,34 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-SYSTEM_INSTRUCTION = """You are an AI fitness coach inside a fitness app called "Fit".
+SYSTEM_INSTRUCTION = """You are an AI fitness coach inside Fit. No emojis. Plain text only.
+Classify intent into: plan_request, progress_update, question, motivation, general.
 
-Your behavior is STRICTLY controlled.
+Rules:
+1. Tone: Calm/strict. Light roast if lazy.
+2. Fitness queries: Respond like a coach, short and actionable.
+3. Keep response under 2 lines. Return JSON only. No formatting cards.
+4. Only update plan if user explicitly asks (action.type = "update_plan").
 
------------------------------------
-CORE RULES:
-
-Do NOT use emojis under any circumstance.
-- No emojis in responses
-- No symbols that resemble emojis
-- No decorative characters
-- No expressive icons
-- Plain text only
-- Keep responses clean, minimal, and professional
-
-1. You MUST stay consistent in tone:
-- Default tone: calm, direct, slightly strict
-- If user is consistent → supportive
-- If user is lazy → light roast (NOT toxic, NOT abusive, NO EMOJIS)
-- NEVER switch randomly
-
-2. You MUST NOT drift:
-- No jokes unless in roast mode
-- No unrelated advice
-- No long paragraphs
-
-3. You MUST REMEMBER CONTEXT:
-You will use the provided user profile, recent activity data, and conversation history in your response.
-
-4. You MUST classify user intent BEFORE responding.
-
------------------------------------
-PLAN GENERATION RULES (STRICT):
-
-- Do NOT generate full structured plans by default.
-- Do NOT include sections like:
-  - Goal
-  - Workout Routine
-  - Nutrition Protocol
-- Do NOT return empty sections or placeholders.
-
-ONLY generate a structured plan IF:
-- user explicitly asks for a plan (e.g. "give me a plan", "diet plan", "workout routine")
-
-IF NOT explicitly asked:
-- respond conversationally
-- give short, direct advice only
-- no structured blocks
-- no formatting for UI cards
-- "action.type" MUST be "none"
-
------------------------------------
-INTENTS:
-
-Classify user message into ONE:
-- "plan_request" → user wants diet/workout plan (action.type = "update_plan")
-- "progress_update" → user shares activity/food/workout
-- "question" → user asks something
-- "motivation" → user feels lazy/unmotivated
-- "general" → anything else
-
------------------------------------
-OUTPUT FORMAT (STRICT JSON ONLY)
-
-You MUST return ONLY JSON. No text outside JSON.
-
+JSON Schema:
 {
-  "intent": "one of the intents",
+  "intent": "intent",
   "tone": "coach" | "roast",
-  "response": "short message to user",
-  "action": {
-    "type": "none" | "update_plan",
-    "data": {
-      "plan_summary": "short and clean summary only (present ONLY if type is update_plan)"
-    }
-  }
-}
-
------------------------------------
-BEHAVIOR RULES:
-- Keep response under 2–3 lines
-- Be specific (use user data if available)
-- Do NOT hallucinate numbers
-- Do NOT repeat same advice
-- If unsure → say less, not more
-"""
+  "response": "message",
+  "action": {"type": "none" | "update_plan", "data": {"plan_summary": "summary"}}
+}"""
 
 def ask_coach(user_profile: dict, recent_activity: dict, conversation_history: list, current_message: str, mode: str = "coach") -> dict:
     context_prompt = f"""
-    User Profile:
-    - Age: {user_profile.get('age', 24)}
-    - Weight: {user_profile.get('weight', 75)} kg
-    - Goal: {user_profile.get('goal', 'fat loss')}
-    
-    Recent Activity today:
-    - Workouts: {recent_activity.get('workouts', '0')}
-    - Calories: {recent_activity.get('calories', '0')}
-    - Steps: {recent_activity.get('steps', '0')}
+    User Profile: Age: {user_profile.get('age', 24)}, Weight: {user_profile.get('weight', 75)} kg, Goal: {user_profile.get('goal', 'fat loss')}.
+    Recent Activity: Workouts: {recent_activity.get('workouts', '0')}, Calories: {recent_activity.get('calories', '0')}, Steps: {recent_activity.get('steps', '0')}.
     """
     
     messages = [
         {"role": "system", "content": SYSTEM_INSTRUCTION},
     ]
     
-    for msg in conversation_history[-6:]:
+    for msg in conversation_history[-4:]:
         messages.append({
             "role": msg.get("role", "user"),
             "content": msg.get("content", "")
@@ -128,7 +51,9 @@ def ask_coach(user_profile: dict, recent_activity: dict, conversation_history: l
             chat = client.chat.completions.create(
                 messages=messages,
                 model="llama-3.3-70b-versatile",
-                temperature=0.2 if mode == "coach" else 0.5,
+                temperature=0.5,
+                max_tokens=100,
+                timeout=5.0,
                 response_format={"type": "json_object"}
             )
             raw = chat.choices[0].message.content.strip()
@@ -137,25 +62,25 @@ def ask_coach(user_profile: dict, recent_activity: dict, conversation_history: l
             if "intent" in parsed and "tone" in parsed and "response" in parsed:
                 return parsed
             
-            raise ValueError("Mismatched keys in response schema")
+            raise ValueError("Mismatched keys")
             
         except Exception as e:
+            print("Chat API call failed or timed out:", e)
             if attempt == 0:
                 messages.append({
                     "role": "user",
-                    "content": "Return ONLY valid JSON. Fix format."
+                    "content": "Return ONLY valid JSON."
                 })
             else:
                 return {
                     "intent": "general",
                     "tone": mode,
-                    "response": "Keep moving! Let's get up and hit the reps tomorrow.",
+                    "response": "Try again",
                     "action": {
                         "type": "none",
                         "data": {}
                     }
                 }
-
 
 def generate_daily_insight(score: int, workout_reps: int, calories_in: int, calories_out: int, steps: int, previous_day_score: Optional[int] = None) -> dict:
     prompt = f"""
@@ -172,11 +97,11 @@ def generate_daily_insight(score: int, workout_reps: int, calories_in: int, calo
 
     Rules:
     - Do NOT use emojis under any circumstance. No emojis in your responses.
-    - Be concise (max 2–3 lines)
+    - Be concise (max 2-3 lines)
     - Be realistic (no exaggeration)
     - If data is missing, acknowledge it
-    - If performance is poor -> lightly roast (NO EMOJIS)
-    - If good -> encourage (NO EMOJIS)
+    - If performance is poor -> lightly roast
+    - If good -> encourage
     - DO NOT invent numbers
     - DO NOT repeat raw stats
 
@@ -194,6 +119,9 @@ def generate_daily_insight(score: int, workout_reps: int, calories_in: int, calo
                 {"role": "user", "content": prompt},
             ],
             model="llama-3.3-70b-versatile",
+            temperature=0.5,
+            max_tokens=100,
+            timeout=5.0,
             response_format={"type": "json_object"}
         )
         raw = chat.choices[0].message.content.strip()
@@ -234,7 +162,7 @@ def generate_score_explanation(workout_score: float, diet_score: float, steps_sc
     system_prompt = """You are a fitness coach explaining a daily score.
 
     Task:
-    Explain in 1–2 short lines how the score was built.
+    Explain in 1-2 short lines how the score was built.
 
     Example:
     "+15 from workout, +30 from diet, +10 from activity. Improve steps tomorrow."
@@ -252,7 +180,9 @@ def generate_score_explanation(workout_score: float, diet_score: float, steps_sc
                 {"role": "user", "content": prompt},
             ],
             model="llama-3.3-70b-versatile",
-            max_tokens=60
+            temperature=0.5,
+            max_tokens=60,
+            timeout=5.0
         )
         return chat.choices[0].message.content.strip()
     except Exception:

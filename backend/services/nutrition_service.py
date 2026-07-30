@@ -11,59 +11,60 @@ load_dotenv()
 # Setup Groq client locally to avoid circular dependencies
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-CALORIE_MAP = {
-    "egg": 70,
-    "boiled egg": 70,
-    "omelette": 150,
-    "roti": 120,
-    "chapati": 120,
-    "rice": 200,
-    "jeera rice": 220,
-    "dal": 180,
-    "dal tadka": 220,
-    "paneer": 265,
-    "paneer butter masala": 320,
-    "chicken": 250,
-    "chicken curry": 300,
-    "grilled chicken": 220,
-    "fish": 200,
-    "fried fish": 300,
-    "biryani": 350,
-    "veg biryani": 300,
-    "poha": 250,
-    "upma": 230,
-    "idli": 60,
-    "dosa": 180,
-    "masala dosa": 250,
-    "vada": 150,
-    "samosa": 260,
-    "pakora": 200,
-    "paratha": 250,
-    "aloo paratha": 300,
-    "butter naan": 260,
-    "naan": 220,
-    "rajma": 220,
-    "chole": 250,
-    "bhindi": 150,
-    "aloo sabzi": 180,
-    "mixed veg": 150,
-    "palak paneer": 280,
-    "kadhi": 200,
-    "curd": 100,
-    "lassi": 180,
-    "milk": 120,
-    "tea": 80,
-    "coffee": 50,
-    "banana": 105,
-    "apple": 95,
-    "mango": 200,
-    "orange": 80,
-    "bread": 70,
-    "butter": 100,
-    "jam": 50,
-    "cake": 300,
-    "ice cream": 200,
-    "chocolate": 150
+FOOD_DB = {
+    "egg": {"calories_per_unit": 70, "unit": "piece"},
+    "boiled egg": {"calories_per_unit": 70, "unit": "piece"},
+    "omelette": {"calories_per_unit": 150, "unit": "piece"},
+    "roti": {"calories_per_unit": 120, "unit": "piece"},
+    "chapati": {"calories_per_unit": 120, "unit": "piece"},
+    "rice": {"calories_per_unit": 200, "unit": "bowl"},
+    "jeera rice": {"calories_per_unit": 220, "unit": "bowl"},
+    "dal": {"calories_per_unit": 180, "unit": "bowl"},
+    "dal tadka": {"calories_per_unit": 220, "unit": "bowl"},
+    "paneer": {"calories_per_unit": 265, "unit": "gram"},
+    "paneer butter masala": {"calories_per_unit": 320, "unit": "bowl"},
+    "chicken": {"calories_per_unit": 250, "unit": "gram"},
+    "chicken curry": {"calories_per_unit": 300, "unit": "bowl"},
+    "grilled chicken": {"calories_per_unit": 220, "unit": "gram"},
+    "fish": {"calories_per_unit": 200, "unit": "gram"},
+    "fried fish": {"calories_per_unit": 300, "unit": "gram"},
+    "biryani": {"calories_per_unit": 350, "unit": "bowl"},
+    "veg biryani": {"calories_per_unit": 300, "unit": "bowl"},
+    "poha": {"calories_per_unit": 250, "unit": "bowl"},
+    "upma": {"calories_per_unit": 230, "unit": "bowl"},
+    "idli": {"calories_per_unit": 60, "unit": "piece"},
+    "dosa": {"calories_per_unit": 180, "unit": "piece"},
+    "masala dosa": {"calories_per_unit": 250, "unit": "piece"},
+    "vada": {"calories_per_unit": 150, "unit": "piece"},
+    "samosa": {"calories_per_unit": 260, "unit": "piece"},
+    "pakora": {"calories_per_unit": 200, "unit": "plate"},
+    "paratha": {"calories_per_unit": 250, "unit": "piece"},
+    "aloo paratha": {"calories_per_unit": 300, "unit": "piece"},
+    "butter naan": {"calories_per_unit": 260, "unit": "piece"},
+    "naan": {"calories_per_unit": 220, "unit": "piece"},
+    "rajma": {"calories_per_unit": 220, "unit": "bowl"},
+    "chole": {"calories_per_unit": 250, "unit": "bowl"},
+    "bhindi": {"calories_per_unit": 150, "unit": "bowl"},
+    "aloo sabzi": {"calories_per_unit": 180, "unit": "bowl"},
+    "mixed veg": {"calories_per_unit": 150, "unit": "bowl"},
+    "palak paneer": {"calories_per_unit": 280, "unit": "bowl"},
+    "kadhi": {"calories_per_unit": 200, "unit": "bowl"},
+    "curd": {"calories_per_unit": 100, "unit": "bowl"},
+    "lassi": {"calories_per_unit": 180, "unit": "glass"},
+    "milk": {"calories_per_unit": 120, "unit": "cup"},
+    "tea": {"calories_per_unit": 80, "unit": "cup"},
+    "coffee": {"calories_per_unit": 50, "unit": "cup"},
+    "banana": {"calories_per_unit": 105, "unit": "piece"},
+    "apple": {"calories_per_unit": 95, "unit": "piece"},
+    "mango": {"calories_per_unit": 200, "unit": "piece"},
+    "orange": {"calories_per_unit": 80, "unit": "piece"},
+    "bread": {"calories_per_unit": 70, "unit": "slice"},
+    "butter": {"calories_per_unit": 100, "unit": "gram"},
+    "jam": {"calories_per_unit": 50, "unit": "tablespoon"},
+    "cake": {"calories_per_unit": 300, "unit": "slice"},
+    "ice cream": {"calories_per_unit": 200, "unit": "cup"},
+    "chocolate": {"calories_per_unit": 150, "unit": "bar"},
+    "salad": {"calories_per_unit": 50, "unit": "bowl"}
 }
 
 def clean_name(name: str) -> str:
@@ -77,12 +78,54 @@ def clean_name(name: str) -> str:
     name = re.sub(r'\s+', ' ', name)
     return name.strip()
 
+def normalize_food(name: str) -> str:
+    name = name.lower().strip()
+
+    # Normalization mappings
+    if "coffee" in name:
+        return "coffee"
+    if "tea" in name:
+        return "tea"
+    if "egg" in name:
+        return "egg"
+    if "roti" in name or "chapati" in name:
+        return "roti"
+    if "rice" in name:
+        return "rice"
+    if "dal" in name or "daal" in name:
+        return "dal"
+    if "paneer" in name:
+        return "paneer"
+    if "chicken" in name:
+        return "chicken"
+    if "salad" in name:
+        return "salad"
+    if "banana" in name:
+        return "banana"
+    if "apple" in name:
+        return "apple"
+    if "bread" in name:
+        return "bread"
+    if "butter" in name:
+        return "butter"
+    if "milk" in name:
+        return "milk"
+
+    return name
+
 def match_food(name: str) -> str:
     name = name.lower()
-    for key in CALORIE_MAP:
+    
+    # First match direct normalization keys
+    normalized = normalize_food(name)
+    if normalized in FOOD_DB:
+        return normalized
+
+    # Then check substring matches in database
+    for key in FOOD_DB:
         if key in name:
             return key
-    
+            
     # extra fallback (VERY IMPORTANT)
     if "cake" in name:
         return "cake"
@@ -92,22 +135,6 @@ def match_food(name: str) -> str:
         return "chocolate"
         
     return None
-
-def normalize_food(name: str) -> str:
-    name = name.lower().strip()
-
-    if "egg" in name:
-        return "egg"
-    if "roti" in name or "chapati" in name:
-        return "roti"
-    if "rice" in name:
-        return "rice"
-    if "dal" in name:
-        return "dal"
-    if "paneer" in name:
-        return "paneer"
-
-    return name
 
 # Vision models expect only item names. Quantities default to 1 on backend.
 class FoodItemVisionName(BaseModel):
@@ -224,24 +251,6 @@ def clean_json_string(text: str) -> str:
         return match_plain.group(1).strip()
     return text.strip()
 
-def estimate_item_calories_fallback(item_name: str) -> int:
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a calorie estimation API. Given a food name, estimate standard calories for 1 normal serving. Return ONLY an integer count of calories. If you are totally unsure, return 0. Do not write text, only the integer number. Do not use emojis."},
-                {"role": "user", "content": f"Food item: {item_name}"}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.1
-        )
-        raw_response = chat_completion.choices[0].message.content.strip()
-        match = re.search(r'\d+', raw_response)
-        if match:
-            return int(match.group(0))
-        return 0
-    except Exception:
-        return 0
-
 def calculate_calories(items_list: list) -> dict:
     processed_items = []
     total_calories = 0
@@ -260,43 +269,24 @@ def calculate_calories(items_list: list) -> dict:
         print("CLEAN:", cleaned)
         print("MATCH:", matched)
         
-        # Check if in CALORIE_MAP
-        if matched and matched in CALORIE_MAP:
-            normalized_name = normalize_food(matched)
-            calories_per_unit = CALORIE_MAP[normalized_name]
+        # Check if in FOOD_DB and quantity is valid
+        if matched and matched in FOOD_DB and qty > 0:
+            calories_per_unit = FOOD_DB[matched]["calories_per_unit"]
             calories = int(round(calories_per_unit * qty))
             total_calories += calories
             processed_items.append({
-                "name": normalized_name,
+                "name": matched,
                 "quantity": qty,
                 "calories": calories,
                 "estimated": False
             })
         else:
-            # Try AI fallback estimation
-            est_cals = estimate_item_calories_fallback(cleaned)
-            if est_cals > 0:
-                calories = int(round(est_cals * qty))
-                total_calories += calories
-                processed_items.append({
-                    "name": cleaned,
-                    "quantity": qty,
-                    "calories": calories,
-                    "estimated": True
-                })
-            else:
-                status = "unknown_food"
-                processed_items.append({
-                    "name": f"{raw_name} (Food not recognized)",
-                    "quantity": qty,
-                    "calories": 0,
-                    "estimated": True
-                })
+            # If any item cannot be matched in DB -> reject immediately
+            status = "rejected"
+            break
                 
     if not processed_items:
-        status = "unknown_food"
-    elif any(i["calories"] == 0 for i in processed_items):
-        status = "unknown_food"
+        status = "rejected"
         
     return {
         "status": status,
@@ -384,8 +374,21 @@ def analyze_food_text_ai(food_description: str):
                 }
 
 def analyze_food_image_ai(base64_image: str):
-    if "," in base64_image:
-        base64_image = base64_image.split(",")[1]
+    if not base64_image or not base64_image.strip():
+        return {
+            "status": "rejected",
+            "items": [],
+            "total_calories": 0,
+            "suggestion": "No image data provided."
+        }
+
+    # Debug logs
+    print("BASE64 LENGTH:", len(base64_image))
+    raw_image_data = base64_image
+    if "," in raw_image_data:
+        raw_image_data = raw_image_data.split(",")[1]
+    image_size_bytes = len(raw_image_data) * 3 // 4
+    print("IMAGE SIZE (bytes):", image_size_bytes)
 
     for attempt in range(2):
         try:
@@ -399,7 +402,7 @@ def analyze_food_image_ai(base64_image: str):
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                    "url": f"data:image/jpeg;base64,{raw_image_data}"
                                 }
                             }
                         ]

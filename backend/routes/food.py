@@ -36,24 +36,25 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
             result = analyze_food_text_ai(req.food)
 
     status = result.get("status", "success")
+    items = result.get("items", [])
 
-    # Guard: If no items returned, reject immediately. Do not log.
-    if status == "success" and not result.get("items"):
+    # If food is not found in database, return unknown_food to show "Food not in database"
+    if status == "unknown_food":
         return {
             "items": [],
             "total_calories": 0,
-            "suggestion": "No valid food detected.",
-            "status": "rejected",
+            "suggestion": "Food not in database.",
+            "status": "unknown_food",
             "logged": False,
             "log_id": None
         }
 
-    # Guard: If pipeline analysis failed (error), return rejected with error message.
-    if status == "error":
+    # If status is not success or items list is empty, reject the request
+    if status != "success" or not items:
         return {
             "items": [],
             "total_calories": 0,
-            "suggestion": result.get("suggestion", "Image analysis failed."),
+            "suggestion": "No valid food detected. Try again.",
             "status": "rejected",
             "logged": False,
             "log_id": None
@@ -66,7 +67,7 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
     log_id = None
     
     if status == "success":
-        item_names = [item.get("name", "") for item in result.get("items", [])]
+        item_names = [item.get("name", "") for item in items]
         combined_name = ", ".join(filter(None, item_names)) or req.name or req.food or "Logged Meal"
         total_cals = result.get("total_calories", 0)
 
@@ -88,7 +89,7 @@ async def analyze_food(req: FoodAnalyzeRequest, db: Session = Depends(get_db)):
         total_cals = 0
 
     return {
-        "items": result.get("items", []),
+        "items": items,
         "total_calories": total_cals,
         "suggestion": result.get("suggestion", ""),
         "status": status,

@@ -125,11 +125,11 @@ export default function FoodPage() {
       const data: FoodResult = await res.json();
       
       if (data.status === "not_food") {
-        setError("No food detected. Please enter or describe food items.");
+        setError("No valid food detected. Try again.");
       } else if (data.status === "unknown_food") {
-        setError("Food not recognized. We only estimate calories for standardized foods in our database.");
+        setError("Food not in database");
       } else if (data.status === "rejected") {
-        setError("No valid food detected. Please check your inputs.");
+        setError("No valid food detected. Try again.");
       } else {
         setResult(data);
       }
@@ -162,10 +162,25 @@ export default function FoodPage() {
     setResult(null);
 
     try {
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64 = canvas.toDataURL("image/jpeg", 0.8);
+      const videoWidth = video.videoWidth || 640;
+      const videoHeight = video.videoHeight || 480;
+
+      // Resize image: max width 512px
+      const maxWidth = 512;
+      let width = videoWidth;
+      let height = videoHeight;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(video, 0, 0, width, height);
+
+      // Compress quality to 0.7
+      const base64 = canvas.toDataURL("image/jpeg", 0.7);
 
       await runImageAnalysis(base64);
     } catch (err) {
@@ -179,8 +194,32 @@ export default function FoodPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setSelectedImage(reader.result as string);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        // Resize image: max width 512px
+        const maxWidth = 512;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress quality to 0.7
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+        setSelectedImage(compressedBase64);
+      };
+      img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
@@ -209,11 +248,11 @@ export default function FoodPage() {
       const data: FoodResult = await res.json();
       
       if (data.status === "not_food") {
-        setError("No food detected. Please capture a clear photo of your meal.");
+        setError("No valid food detected. Try again.");
       } else if (data.status === "unknown_food") {
-        setError("Food not recognized. We only estimate calories for standardized foods in our database.");
+        setError("Food not in database");
       } else if (data.status === "rejected") {
-        setError("No valid food detected. Please check your inputs.");
+        setError("No valid food detected. Try again.");
       } else {
         setResult(data);
       }
